@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, shrink-to-fit=no">
+    <meta name="referrer" content="origin">
+    <meta http-equiv="Cache-Control" content="no-transform">
+    <meta http-equiv="Cache-Control" content="no-siteapp">
+    <title>Ik-analyzer的安装使用、自定义词库以及热更新方案</title>
+    <link rel="shortcut icon" href="#"/>
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css">
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css">
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css">
+    
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js"></script>
+
+<meta name="generator" content="Hexo 5.4.0"><link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+</head>
+<body>
+    <a id="cover"></a>
+    <div id="header">
+    <div class="header">
+        <div class="vertical">
+            <div class="inner">
+                <h1 class="header-subtitle">Ik-analyzer的安装使用、自定义词库以及热更新方案</h1>
+                <div class="header-subinfo">
+                    <p class="article-info-text">
+                        <span>
+                            <i class="iconfont icon-time"></i> 发表时间：2021-12-23
+                        </span>
+                        
+                            <span id="/2021/12/23/Ik-analyzer的安装使用、自定义词库以及热更新方案/" class="leancloud_visitors" data-flag-title="Ik-analyzer的安装使用、自定义词库以及热更新方案">
+                                <i class="iconfont icon-browse"></i> 阅读：<sapn class="leancloud-visitors-count"></span>
+                            </span>
+                        
+                        <span>
+                            <i class="iconfont icon-interactive"></i> 评论：<span class="valine-comment-count" data-xid="/2021/12/23/Ik-analyzer的安装使用、自定义词库以及热更新方案/"></span>
+                        </span>  
+                    </p>                 
+                </div>
+            </div>
+        </div>
+        <canvas id="articleHeaderCanvas"></canvas>
+    </div>
+</div>
+    <div id="container">
+    <div id="content">
+        <div id="article">
+    <div class="toc"></div>
+    <div class="article-body">
+        <h3 id="前言"><a href="#前言" class="headerlink" title="前言"></a>前言</h3><p>前面的案例使用standard、english分词器，是英文原生的分词器，对中文分词支持不太好。中文作为全球最优美、最复杂的语言，目前中文分词器较多，ik-analyzer、结巴中文分词、THULAC、NLPIR和阿里的aliws都是非常优秀的，我们以ik-analyzer作为讲解的重点，其它分词器可以举一反三。</p>
+<h3 id="概要"><a href="#概要" class="headerlink" title="概要"></a>概要</h3><p>本篇主要介绍中文分词器ik-analyzer的安装使用、自定义词库以及热更新方案。</p>
+<h3 id="分词器插件安装"><a href="#分词器插件安装" class="headerlink" title="分词器插件安装"></a>分词器插件安装</h3><p>我们Elasticsearch 6.3.1版本为例，集成IK分词器，其他的分词器过程也类似，在ES的bin目录下执行插件安装命令即可：</p>
+<p><code>./elasticsearch-plugin install https://github.com/medcl/elasticsearch-analysis-ik/releases/download/v6.3.1/elasticsearch-analysis-ik-6.3.1.zip</code></p>
+<p>其中install后面的那个的地址是 <a href="medcl/elasticsearch-analysis-ik">elasticsearch-analysis-ik</a> 的github release对应ES版本的下载地址。</p>
+<p>插件的版本最好与Elasticsearch版本保持一致，如果Elasticsearch为别的版本，下载对应版本的ik-analyzer插件即可。</p>
+<p>安装成功后，ES启动日志就能看到如下信息：</p>
+<p><code>[2019-11-27T12:17:15,255][INFO ][o.e.p.PluginsService] [node-1] loaded plugin [analysis-ik]</code></p>
+<h3 id="IK分词器"><a href="#IK分词器" class="headerlink" title="IK分词器"></a>IK分词器</h3><h4 id="基础知识"><a href="#基础知识" class="headerlink" title="基础知识"></a>基础知识</h4><p>IK分词器包含两种analyzer，一般用ik_max_word</p>
+<p>ik_max_word：会将文本做最细粒度的拆分</p>
+<p>ik_smart：会做最粗粒度的拆分</p>
+<p>测试分词效果</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ik_max_word分词测试</span></span><br><span class="line">GET /_analyze</span><br><span class="line">&#123;</span><br><span class="line">	<span class="attr">&quot;text&quot;</span>: <span class="string">&quot;您好祖国&quot;</span>,</span><br><span class="line">	<span class="attr">&quot;analyzer&quot;</span>: <span class="string">&quot;ik_smart&quot;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 响应如下：</span></span><br><span class="line">&#123;</span><br><span class="line">	<span class="attr">&quot;tokens&quot;</span>: [ </span><br><span class="line">		&#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;您好&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">0</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">2</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">0</span></span><br><span class="line">		&#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;祖国&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">2</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">4</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">1</span></span><br><span class="line">        &#125;</span><br><span class="line">	]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// ik_max_word分词测试</span></span><br><span class="line">GET /_analyze</span><br><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;text&quot;</span>: <span class="string">&quot;我和我的祖国&quot;</span>,</span><br><span class="line">    <span class="attr">&quot;analyzer&quot;</span>: <span class="string">&quot;ik_max_word&quot;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="comment">// 响应如下：</span></span><br><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;tokens&quot;</span>: [</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;我&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">0</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">0</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;和我&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">1</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;的&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">4</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">2</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;祖国&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">4</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">6</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">3</span></span><br><span class="line">        &#125;</span><br><span class="line">    ]</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+
+
+<h4 id="配置文件"><a href="#配置文件" class="headerlink" title="配置文件"></a>配置文件</h4><p>ik插件安装完成后，可以在<code>elasticsearch-6.3.1/config/analysis-ik</code>看到ik的配置文件IKAnalyzer.cfg.xml</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="meta">&lt;?xml version=&quot;1.0&quot; encoding=&quot;UTF-8&quot;?&gt;</span></span><br><span class="line"><span class="meta">&lt;!DOCTYPE <span class="meta-keyword">properties</span> <span class="meta-keyword">SYSTEM</span> <span class="meta-string">&quot;http://java.sun.com/dtd/properties.dtd&quot;</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">properties</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">comment</span>&gt;</span>IK Analyzer 扩展配置<span class="tag">&lt;/<span class="name">comment</span>&gt;</span></span><br><span class="line">    <span class="comment">&lt;!--用户可以在这里配置自己的扩展字典 --&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">entry</span> <span class="attr">key</span>=<span class="string">&quot;ext_dict&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">entry</span>&gt;</span></span><br><span class="line">    <span class="comment">&lt;!--用户可以在这里配置自己的扩展停止词字典--&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">entry</span> <span class="attr">key</span>=<span class="string">&quot;ext_stopwords&quot;</span>&gt;</span><span class="tag">&lt;/<span class="name">entry</span>&gt;</span></span><br><span class="line">    <span class="comment">&lt;!--用户可以在这里配置远程扩展字典 --&gt;</span></span><br><span class="line">    <span class="comment">&lt;!-- &lt;entry key=&quot;remote_ext_dict&quot;&gt;words_location&lt;/entry&gt; --&gt;</span></span><br><span class="line">    <span class="comment">&lt;!--用户可以在这里配置远程扩展停止词字典--&gt;</span></span><br><span class="line">    <span class="comment">&lt;!-- &lt;entry key=&quot;remote_ext_stopwords&quot;&gt;words_location&lt;/entry&gt; --&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">properties</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>该目录下带有许多文件，含义如下：</p>
+<ul>
+<li><p>main.dic ik 原生内置的中文词库，里面有275909条现成的词语</p>
+</li>
+<li><p>quantifier.dic 量词和单位名称，如个，斤，克，米之类的</p>
+</li>
+<li><p>suffix.dic 常见后缀词，如江，村，省，市，局等</p>
+</li>
+<li><p>surname.dic 中国姓氏</p>
+</li>
+<li><p>stopword.dic 停用词，目前默认的是写的几个英文单词，如and, a, the等</p>
+</li>
+<li><p>preposition.dic 副词、语气助词，连接词等无实际含义的词语，如却，也，是，否则之类的</p>
+</li>
+</ul>
+<p>6.3.1版本的IK分词器还提供了额外的词库补充文件，extra开头的那几个就是，如extra_main.dic，共收录398716条现有的词语，默认没有使用，有需要可以在配置文件IKAnalyzer.cfg.xml上添加，其他类似。</p>
+<p>最重要的是main.dic和stopword.dic。stopword(停用词)，分词时会直接被干掉，不会建立在倒排索引中。</p>
+<h4 id="自定义词库"><a href="#自定义词库" class="headerlink" title="自定义词库"></a>自定义词库</h4><p>1）创建自定义词库文件mydic.dic，并在IKAnalyzer.cfg.xml的ext_dict属性里加上该文件名，可以在mydic.dic文件里补充自己的词汇，如网络流行词：跪族篮孩。</p>
+<p>添加前的分词效果：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">GET /forum/_analyze</span><br><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;text&quot;</span>: <span class="string">&quot;跪族篮孩&quot;</span>,</span><br><span class="line">    <span class="attr">&quot;analyzer&quot;</span>: <span class="string">&quot;ik_max_word&quot;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">响应结果：</span><br><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;tokens&quot;</span>: [</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;跪&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">0</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">0</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;族&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">2</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">1</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;篮&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">2</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">2</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;孩&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">4</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">3</span></span><br><span class="line">        &#125;</span><br><span class="line">    ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>添加词库后：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;tokens&quot;</span>: [</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;跪族篮孩&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">0</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">4</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">0</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;跪&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">0</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">1</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;族&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">2</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">2</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;篮&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">2</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">3</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;孩&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">4</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">4</span></span><br><span class="line">        &#125;</span><br><span class="line">    ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>能看到完整的“跪族篮孩”，能看到完整的语词出现。</p>
+<p>2）自己建立停用词库，如了，的，哈，啥，这几个字不想去建立索引</p>
+<p>在配置文件IKAnalyzer.cfg.xml下ext_stopwords标签添加：extra_stopword.dic，并加几个词，修改后同样要重启es。</p>
+<p>例：加一个”啥”字在ext_stopword中</p>
+<p>修改前：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br></pre></td><td class="code"><pre><span class="line">GET /forum/_analyze</span><br><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;text&quot;</span>: <span class="string">&quot;啥都好&quot;</span>,</span><br><span class="line">    <span class="attr">&quot;analyzer&quot;</span>: <span class="string">&quot;ik_max_word&quot;</span></span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">响应结果：</span><br><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;tokens&quot;</span>: [</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;啥&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">0</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">0</span></span><br><span class="line">        &#125;,</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;都好&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">1</span></span><br><span class="line">        &#125;</span><br><span class="line">    ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>添加停用词后:</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;tokens&quot;</span>: [</span><br><span class="line">        &#123;</span><br><span class="line">            <span class="attr">&quot;token&quot;</span>: <span class="string">&quot;都好&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;start_offset&quot;</span>: <span class="number">1</span>,</span><br><span class="line">            <span class="attr">&quot;end_offset&quot;</span>: <span class="number">3</span>,</span><br><span class="line">            <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">            <span class="attr">&quot;position&quot;</span>: <span class="number">0</span></span><br><span class="line">        &#125;</span><br><span class="line">    ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>那个啥字直接没有了，结果符合预期。</p>
+<h3 id="热更新方案"><a href="#热更新方案" class="headerlink" title="热更新方案"></a>热更新方案</h3><p>上面自定义词库有一个致命问题：必须要重启ES，新增的词库才能生效。</p>
+<p>研发、测试环境自己玩玩无所谓，多半是自己使用，节点又少，重启就重启，关系不大。但想想生产环境能随便让你重启吗？动辄几百个ES实例，重启的事就别想了，另外找办法。</p>
+<p>由此引出现在的热更新需求，让ES不停机能立即加载新增的词库。</p>
+<p>热更新的方案</p>
+<ol>
+<li><p>基于id分词器原生支持的更新方案，部署一个web服务器，提供一个http接口，通过modified和try两个http响应头，来提供词语的热更新操作。</p>
+</li>
+<li><p>修改ik分词器源码，然后手动支持从mysql中每隔一定时间，自动加载新的词库。</p>
+</li>
+</ol>
+<p>推荐方案二，方案一虽是官方提供的，但操作起来比较麻烦，还需要部署http服务器。</p>
+<p>方案步骤:</p>
+<p>1）下载源码</p>
+<p>git clone medcl/elasticsearch-analysis-ik</p>
+<p>git checkout tags/v6.3.1</p>
+<p>该工程是Maven项目工程，将代码导入IDEA或Eclipse。</p>
+<p>2）修改点</p>
+<p><code>org.wltea.analyzer.dic.Dictionary</code></p>
+<p>主要思路是在这个类的initial()方法内增加一个入口，反复去调用reLoadMainDict()方法，此方法如下：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">void</span> <span class="title">reLoadMainDict</span><span class="params">()</span> </span>&#123;</span><br><span class="line">    logger.info(<span class="string">&quot;重新加载词典...&quot;</span>);</span><br><span class="line">    <span class="comment">// 新开一个实例加载词典，减少加载过程对当前词典使用的影响</span></span><br><span class="line">    Dictionary tmpDict = <span class="keyword">new</span> Dictionary(configuration);</span><br><span class="line">    tmpDict.configuration = getSingleton().configuration;</span><br><span class="line">    tmpDict.loadMainDict();</span><br><span class="line">    tmpDict.loadStopWordDict();</span><br><span class="line">    _MainDict = tmpDict._MainDict;</span><br><span class="line">    _StopWords = tmpDict._StopWords;</span><br><span class="line">    logger.info(<span class="string">&quot;重新加载词典完毕...&quot;</span>);</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>这个方法就是重新加载词库的，然后修改loadMainDict()和loadStopWordDict()方法，在这两个方法最后加上读取数据库获取最新的数据记录的逻辑即可。数据库的表结构自己定义两张表，满足数据库表设计规范即可。</p>
+<p>3）IDE上mvn package打包</p>
+<p>可以直接用target/releases/目录下的elasticsearch-analysis-ik-6.3.1.zip</p>
+<p>4）解压zip包，加上jdbc的配置，该修改的修改，重启ES，看日志</p>
+<p>5）在数据库里加几个字段，在线尝试是否生效。</p>
+<h5 id="方案延伸"><a href="#方案延伸" class="headerlink" title="方案延伸"></a>方案延伸</h5><p>该方案使用数据库轮询的方法，简单有效，但比较浪费资源，毕竟生产上修改词库的动作是按需求发生的，可以考虑由定时轮询改成MQ消息通知，这样就可以做到按需更新，而不用浪费太多的资源做词典更新。</p>
+<h3 id="小结"><a href="#小结" class="headerlink" title="小结"></a>小结</h3><p>本篇对中文分词器IK作了简单的讲解，市面上流行的中文分词器很多，如果我们遇到有中文分词的需求，货比三家是永远不过时的道理，调研可能要花费一些时间，但能挑到适合自己项目的分词器，还是划算的。</p>
+
+        <p class="suffix-end">__END__</p>
+        <div class="suffix-box">
+            <div class="suffix-box-left">
+                <img src="https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg" alt="Lustm">
+            </div>
+            <div class="suffix-box-right">
+                <span class="suffix-box-title">文章作者</span>：Lustm
+                <br>
+                <span class="suffix-box-title">文章出处</span>：<a href="/2021/12/23/Ik-analyzer%E7%9A%84%E5%AE%89%E8%A3%85%E4%BD%BF%E7%94%A8%E3%80%81%E8%87%AA%E5%AE%9A%E4%B9%89%E8%AF%8D%E5%BA%93%E4%BB%A5%E5%8F%8A%E7%83%AD%E6%9B%B4%E6%96%B0%E6%96%B9%E6%A1%88/" target="_blank">Ik-analyzer的安装使用、自定义词库以及热更新方案</a>
+                <br>
+                <span class="suffix-box-title">作者签名</span>：简单地活着, 肆意又精彩.
+                <br>
+                <span class="suffix-box-title">关于主题</span>：<a href="https://github.com/first19326/Hexo-LiveForCode" target="_blank">Hexo - Live For Code</a>
+                <br>
+                <span class="suffix-box-title">版权声明</span>：文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" title="BY-NC-SA" target="_blank">BY-NC-SA</a> 许可协议，转载请注明出处
+                <br>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+    </div>
+    <div class="article-footer">
+        
+            <div class="category">
+                分类：
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/">搜索引擎</a>
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/elasticsearch/">elasticsearch</a>
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/elasticsearch/%E5%88%86%E8%AF%8D%E5%99%A8/">分词器</a>
+                
+            </div>
+        
+        
+            <div class="tag">
+                标签：
+                
+                    <a href="/tags/elasticsearch/">elasticsearch</a>
+                
+            </div>
+        
+        <div class="article-prev-next">
+            
+                <a href="/2021/12/29/%E5%87%A0%E4%B8%AA%E5%B8%B8%E7%94%A8ES%E6%9F%A5%E8%AF%A2%E5%91%BD%E4%BB%A4/" class="prev-prefix">« </a> 上一篇：    <a href="/2021/12/29/%E5%87%A0%E4%B8%AA%E5%B8%B8%E7%94%A8ES%E6%9F%A5%E8%AF%A2%E5%91%BD%E4%BB%A4/" title="发布于 2021-12-29 09:09">几个常用ES查询命令</a>
+                <br>
+            
+            
+                <a href="/2021/12/21/Elasticsearch%E5%8F%AF%E4%BB%A5%E6%9B%BF%E4%BB%A3NoSQL%E5%90%97/" class="next-prefix">» </a> 下一篇：    <a href="/2021/12/21/Elasticsearch%E5%8F%AF%E4%BB%A5%E6%9B%BF%E4%BB%A3NoSQL%E5%90%97/" title="发布于 2021-12-21 05:12">Elasticsearch可以替代NoSQL吗?</a>
+            
+        </div>
+    </div>
+    
+    <div class="article-comments">
+        <div class="comments-title">
+            评论列表
+        </div>
+        <div class="comments-content">
+        </div>
+    </div>
+
+</div>
+
+    </div>
+</div>
+    <div id="footer"></div>
+    <div id="sidebar">
+    <div class="menu-wrap" style="display:none;">
+        <nav class="menu">
+            <div class="menu-introduce"> 
+                <div class="introduce-avatar"></div> 
+                <div class="introduce-info"> 
+                    <div class="introduce-user"><span></span></div>        
+                </div> 
+            </div> 
+            <div class="menu-list">
+                <ul></ul> 
+            </div> 
+            <div class="menu-link"></div> 
+        </nav>
+        <button class="menu-button-close"></button>
+        <div class="morph-shape" id="morph-shape" data-morph-open="M-7.312,0H15c0,0,66,113.339,66,399.5C81,664.006,15,800,15,800H-7.312V0z;M-7.312,0H100c0,0,0,113.839,0,400c0,264.506,0,400,0,400H-7.312V0z">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 800" preserveAspectRatio="none">
+                <path d="M-7.312,0H0c0,0,0,113.839,0,400c0,264.506,0,400,0,400h-7.312V0z"/>
+            </svg>
+        </div>
+    </div>
+    <button class="menu-button-open">MENU</button>
+    <div class="menu-cover"></div>
+</div>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js"></script>
+<div class="search-window">
+    <div class="search-content">
+        <div class="search-content-icon">
+            <i class="iconfont icon-search"></i>
+        </div>
+        <div id="search-input" class="search-input"></div>
+    </div>
+
+    <div class="search-scroll">
+        <div class="search-result">
+            <div id="search-stats" class="search-stats"></div>
+            <div id="search-hits"></div>
+            <div id="search-pagination" class="search-pagination"></div>
+        </div>
+    </div>
+
+    <span class="search-close-icon">
+        <i class="iconfont icon-close"></i>
+    </span>
+</div>
+    <div id="tools">
+    <div class="progressbar-top"></div>
+
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css">
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js"></script>
+        <meting-js id="3778678" lrcshow="false" server="netease" type="playlist" fixed="true" autoplay="false" loop="all" order="random" preload="auto" volume="0.67" mutex="true"></meting-js>
+    
+    
+    <div class="wrap-right"></div>
+    <div class="loading"></div>
+</div>
+    <script>
+    window.config = {
+        GitHubUserName     : 'lustm',
+        GitHubRepositories : 'hexo-source',
+
+        BlogUser      : 'Lustm',
+        BlogAvatar    : 'https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg',
+        BlogStartDate : '2021-12-23',
+
+        WebsiteTitleBlur         : '(◍´꒳`◍) Hi, come back quickly',
+        WebsiteTitleBlurTimeOut  : 500,
+        WebsiteTitleFocus        : '(*´∇｀*) Welcome back!',
+        WebsiteTitleFocusTimeOut : 1000,
+        WebsiteFavicon           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/logo.png',
+
+        ProgressBar: {
+            id       : 'topProgressBar',
+            color    : '#77B6FF',
+            height   : '2px',
+            duration : 0.2
+        },
+
+        Loading: {
+            rebound: {
+                tension  : 16,
+                friction : 5
+            },
+            spinner: {
+                id     : 'spinner',
+                radius : 90,
+                sides  : 3,
+                depth  : 4,
+                colors : {
+                    background : '#F0F0F0',
+                    stroke     : '#272633',
+                    base       : '',
+                    child      : '#272633'
+                },
+                alwaysForward : true,
+                restAt        : 0.5,
+                renderBase    : false
+            }
+        },
+
+        HomeHeaderAnimationRendered : true,
+        HomeHeaderAnimation         : {
+            radius      : 15,
+            density     : 0.2,
+            color       : 'rgba(255, 255, 255, .2)',
+            clearOffset : 0.3
+        },
+
+        ArticleHeaderAnimationRendered : false,
+        ArticleHeaderAnimation         : {
+            triW                  : 14,
+            triH                  : 20,
+            neighbours            : [
+                
+                    'side',
+                
+                    'top',
+                
+                    'bottom',
+                
+            ],
+            speedTrailAppear      : 0.1,
+            speedTrailDisappear   : 0.1,
+            speedTriOpen          : 1,
+            trailMaxLength        : 30,
+            trailIntervalCreation : 100,
+            delayBeforeDisappear  : 2,
+            colors                : [
+                
+                    '#96EDA6',
+                
+                    '#5BC6A9',
+                
+                    '#38668C',
+                
+                    '#374D84',
+                
+                    '#BED5CB',
+                
+                    '#62ADC6',
+                
+                    '#8EE5DE',
+                
+                    '#304E7B',
+                
+            ]
+        },
+
+        BackAnimationRendered          : true,
+        IEBrowserBackAnimationRendered : false,
+        BackAnimation                  : {
+            colorSaturation  : '60%',
+            colorBrightness  : '50%',
+            colorAlpha       : 0.5,
+            colorCycleSpeed  : 5,
+            verticalPosition : 'random',
+            horizontalSpeed  : 200,
+            ribbonCount      : 3,
+            strokeSize       : 0,
+            parallaxAmount   : -0.2,
+            animateSections  : true
+        },
+
+        HomeHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpg',
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpeg',
+            
+        ],
+        HomeBannerText  : '',
+
+        ArticleHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/article.jpg',
+            
+        ],
+
+        OtherBannerText : '',
+
+        MenuList : [
+            
+                {
+                    name   : '首页',
+                    href   : '/',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '标签',
+                    href   : '/tag',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '分类',
+                    href   : '/category',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '归档',
+                    href   : '/archive',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '赞赏',
+                    href   : '/donate',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '关于',
+                    href   : '/about',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '订阅',
+                    href   : '/atom.xml',    
+                    target : '_blank',
+                    class  : ''
+                },
+            
+                {
+                    name   : '搜索',
+                    href   : '',    
+                    target : '',
+                    class  : 'search'
+                },
+            
+                {
+                    name   : '留言板',
+                    href   : '/comment',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '友情链接',
+                    href   : '/friend',    
+                    target : '',
+                    class  : ''
+                },
+            
+        ],
+        MenuLink : [
+            
+                
+                    {
+                        icon : 'icon-weibo', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-wechat', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-qq', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-github', 
+                        url  : 'https://github.com/lustm'
+                    },
+                
+            
+        ],
+
+        FooterStyle : 2,
+        BottomText  : {
+            icon    : 'like-fill',
+            left    : '人生若只如初见',
+            right   : '何事秋风悲画扇'
+        },
+        ThemeInfo   : true,
+
+        ConsoleList : [
+            
+                
+                    [
+                        
+                            
+                                'Based on cnblogs theme SimpleMemory.',
+                            
+                                '',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'SimpleMemory Author:',
+                            
+                                'BNDong',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'Theme:',
+                            
+                                'LiveForCode',
+                            
+                        
+                    ],
+                
+            
+        ],
+
+        FontIconExtend : '',
+
+        Donate : {
+            paypal  : '',
+            bitcoin : '',
+            alipay  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/alipay.png',
+            wechat  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/wechat.png'
+        },
+
+        Code : {
+            style : 'normal'
+        },  
+
+        Search : {
+            applicationID : 'BX367M4TD2',
+            apiKey        : '522ed64d7cc9964a9fe64ad7f15b66bf',
+            indexName     : 'hexo',
+            hits          : {
+                page : 10
+            },
+            labels        : {
+                placeholder : '搜索',
+                empty       : '未发现与 「${query}」 相关的内容',
+                stats       : '${hits} 条相关条目，使用了 ${time} 毫秒',
+            }
+        }, 
+
+        Valine : {
+            switch         : true,
+            el             : '.comments-content',
+            appId          : 'vU2CPQHyaPOyOheG1dc6zkOt-MdYXbMMI',
+            appKey         : 'xAx3L0LGorEGIyPEjqhcc4nb',
+            placeholder    : '你是我一生只会遇见一次的惊喜...',
+            avatar         : 'mm',
+            meta           : 'nick,mail,link',
+            requiredFields : 'nick,mail',
+            pageSize       : 5,
+            lang           : 'zh-cn',
+            visitor        : true,
+            enableQQ       : true
+        },
+
+        Tocbot : {
+            switch                : true,
+            tocSelector           : '.toc',
+            contentSelector       : '.article-body',
+            headingSelector       : 'h1, h2, h3, h4, h5',
+            headingsOffset        : 0,
+            scrollSmooth          : true,
+            scrollSmoothOffset    : -5,
+            positionFixedSelector : '.toc',
+            positionFixedClass    : 'toc-fixed',
+            fixedSidebarOffset    : '',
+        },
+
+        Require : {
+            baseUrl     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/',
+            waitSeconds : 100
+        },
+
+        Music : {
+            type : 'Meting'
+        },
+        APlayer : {
+            container : '.aplayer',
+            fixed     : true,
+            autoplay  : false,
+            loop      : 'all',
+            order     : 'random',
+            preload   : 'auto',
+            volume    : 0.67,
+            mutex     : true,
+            lrcType   : 3,
+            audio     : [
+                
+                    {
+                        name   : 'aLIEz',
+                        artist : 'mizuki（瑞葵）',
+                        cover  : '/music/cover/aLIEz.jpg',
+                        url    : '/music/song/aLIEz.mp3',
+                        lrc    : '/music/lrc/aLIEz.lrc'
+                    },
+                
+                    {
+                        name   : 'Endless Tears',
+                        artist : 'CLIFF EDGE',
+                        cover  : '/music/cover/Endless Tears.jpg',
+                        url    : '/music/song/Endless Tears.mp3',
+                        lrc    : '/music/lrc/Endless Tears.lrc'
+                    },
+                
+                    {
+                        name   : 'Miracle',
+                        artist : 'Cascada',
+                        cover  : '/music/cover/Miracle.jpg',
+                        url    : '/music/song/Miracle.mp3',
+                        lrc    : '/music/lrc/Miracle.lrc'
+                    },
+                
+                    {
+                        name   : 'Roll The Dice',
+                        artist : '高珊',
+                        cover  : '/music/cover/Roll The Dice.jpg',
+                        url    : '/music/song/Roll The Dice.mp3',
+                        lrc    : '/music/lrc/Roll The Dice.lrc'
+                    },
+                
+                    {
+                        name   : 'See You Again',
+                        artist : 'Charlie Puth, Wiz Khalifa',
+                        cover  : '/music/cover/See You Again.jpg',
+                        url    : '/music/song/See You Again.mp3',
+                        lrc    : '/music/lrc/See You Again.lrc'
+                    },
+                
+                    {
+                        name   : 'Traveling Light',
+                        artist : 'Joel Hanson, Sara Groves',
+                        cover  : '/music/cover/Traveling Light.jpg',
+                        url    : '/music/song/Traveling Light.mp3',
+                        lrc    : '/music/lrc/Traveling Light.lrc'
+                    },
+                
+                    {
+                        name   : '痴心绝对',
+                        artist : '李圣杰',
+                        cover  : '/music/cover/痴心绝对.jpg',
+                        url    : '/music/song/痴心绝对.mp3',
+                        lrc    : '/music/lrc/痴心绝对.lrc'
+                    },
+                
+                    {
+                        name   : '好想大声说爱你',
+                        artist : 'BAAD（バード）',
+                        cover  : '/music/cover/好想大声说爱你.jpg',
+                        url    : '/music/song/好想大声说爱你.mp3',
+                        lrc    : '/music/lrc/好想大声说爱你.lrc'
+                    },
+                
+            ]
+        },
+        Meting : {
+            id       : '3778678', 
+            lrcshow  : false, 
+            server   : 'netease', 
+            type     : 'playlist', 
+            fixed    : true, 
+            autoplay : false, 
+            loop     : 'all', 
+            order    : 'random', 
+            preload  : 'auto', 
+            volume   : 0.67, 
+            mutex    : true
+        },
+
+        Mouse : {
+            enable  : true,
+            options : {
+                size  : 6,
+                sizeF : 24
+            }
+        },
+
+        LazyLoad : {
+            default : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/lazyload.svg'
+        },
+  
+        Style : {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css',
+            archive          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/archive.css',
+            donate           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/donate.css',
+            fancybox         : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/jquery.fancybox.css',
+            footer           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/footer.css',
+            iconfont         : 'https://at.alicdn.com/t/font_1546312_l3yohatebw.css',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/index.css',
+            menuBubble       : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/menu-bubble.css',
+            page             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/page.css',
+            post             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css',
+            search           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css',
+            tocbot           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/tocbot.css',
+            normal           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css',
+            night            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/night.css',
+            clipboard        : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/clipboard.css'
+        },
+
+        Script: {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js',
+            config           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.config.js',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js',
+            instantSearch    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js',
+            jQuery           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js',
+            loading          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/loading.js',
+            meting           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js',
+            iscroll          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js',
+            require          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.min.js'
+        },
+
+        Font: {
+            LongCang   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css',
+            Monda      : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css',
+            NotoSansSC : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css',
+            Playball   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css',
+            PTMono     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css',
+            RobotoSlab : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css',
+            Rosario    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css',
+            UbuntuMono : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css'
+        },
+
+        Suffix : {
+            about : '简单地活着, 肆意又精彩.'
+        },
+            
+        Theme : {
+            url  : 'https://github.com/first19326/Hexo-LiveForCode',
+            name : 'Hexo - Live For Code'
+        }  
+    };
+</script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js"></script>
+</body>
+</html>

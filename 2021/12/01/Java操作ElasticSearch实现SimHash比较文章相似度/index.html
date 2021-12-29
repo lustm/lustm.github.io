@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, shrink-to-fit=no">
+    <meta name="referrer" content="origin">
+    <meta http-equiv="Cache-Control" content="no-transform">
+    <meta http-equiv="Cache-Control" content="no-siteapp">
+    <title>Java操作ElasticSearch实现SimHash比较文章相似度</title>
+    <link rel="shortcut icon" href="#"/>
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css">
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css">
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css">
+    
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js"></script>
+
+<meta name="generator" content="Hexo 5.4.0"><link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+</head>
+<body>
+    <a id="cover"></a>
+    <div id="header">
+    <div class="header">
+        <div class="vertical">
+            <div class="inner">
+                <h1 class="header-subtitle">Java操作ElasticSearch实现SimHash比较文章相似度</h1>
+                <div class="header-subinfo">
+                    <p class="article-info-text">
+                        <span>
+                            <i class="iconfont icon-time"></i> 发表时间：2021-12-01
+                        </span>
+                        
+                            <span id="/2021/12/01/Java操作ElasticSearch实现SimHash比较文章相似度/" class="leancloud_visitors" data-flag-title="Java操作ElasticSearch实现SimHash比较文章相似度">
+                                <i class="iconfont icon-browse"></i> 阅读：<sapn class="leancloud-visitors-count"></span>
+                            </span>
+                        
+                        <span>
+                            <i class="iconfont icon-interactive"></i> 评论：<span class="valine-comment-count" data-xid="/2021/12/01/Java操作ElasticSearch实现SimHash比较文章相似度/"></span>
+                        </span>  
+                    </p>                 
+                </div>
+            </div>
+        </div>
+        <canvas id="articleHeaderCanvas"></canvas>
+    </div>
+</div>
+    <div id="container">
+    <div id="content">
+        <div id="article">
+    <div class="toc"></div>
+    <div class="article-body">
+        <p>最近工作中要求实现相似文本查询的功能，我于是决定用SimHash实现。</p>
+<p>常规思路通常分为以下四步：</p>
+<p>1、实现SimHash算法。</p>
+<p>2、保存文章时，同时保存SimHash为倒排索引。</p>
+<p>3、入库时或使用定时任务，在倒排索引中找到碰撞的SimHash，保存为结果表。</p>
+<p>4、需要查询一篇文章的相似文章时，根据文章ID，查询结果表，找到相似文章。</p>
+<span id="more"></span>
+
+<p>不过这里有个小问题，如果一篇多次入库的文章的SimHash发生变化，或者文章被删除啥的，结果表可能很难及时更新。</p>
+<p>同时ES刚好很擅长查询与维护倒排索引，所以我想能不能直接交给ES帮我维护SimHash的倒排索引，从而跳过使用结果表呢？</p>
+<p>那么以上逻辑会简化到3步：</p>
+<p>1、实现SimHash算法。</p>
+<p>2、保存文章时，同时在ES中保存SimHash字段（和正文其它字段一起）。</p>
+<p>3、需要查询一篇文章的相似文章时，根据文章ID查到SimHash值，再去ES查询匹配的其它文章ID，不过这里<strong>需要在服务层做个汉明距离的过滤</strong>。</p>
+<p>说干就干，以下是我的实现代码，基于网上已有的算法进行了一些修改，总之给大家抛砖引玉了，如果有做的不好的地方还请大家指出。</p>
+<p>首先添加依赖，使用HanLP分词，Jsoup提供正文HTML标签去除服务。</p>
+<figure class="highlight xml"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br></pre></td><td class="code"><pre><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>com.hankcs<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>hanlp<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>portable-1.8.1<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br><span class="line"></span><br><span class="line"><span class="tag">&lt;<span class="name">dependency</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">groupId</span>&gt;</span>org.jsoup<span class="tag">&lt;/<span class="name">groupId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">artifactId</span>&gt;</span>jsoup<span class="tag">&lt;/<span class="name">artifactId</span>&gt;</span></span><br><span class="line">    <span class="tag">&lt;<span class="name">version</span>&gt;</span>1.13.1<span class="tag">&lt;/<span class="name">version</span>&gt;</span></span><br><span class="line"><span class="tag">&lt;/<span class="name">dependency</span>&gt;</span></span><br></pre></td></tr></table></figure>
+
+<p>接下来是SimHash的核心类，我这里直接写死了64位SimHash，判重阈值为3：</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br><span class="line">144</span><br><span class="line">145</span><br><span class="line">146</span><br><span class="line">147</span><br><span class="line">148</span><br><span class="line">149</span><br><span class="line">150</span><br><span class="line">151</span><br><span class="line">152</span><br><span class="line">153</span><br><span class="line">154</span><br><span class="line">155</span><br><span class="line">156</span><br><span class="line">157</span><br><span class="line">158</span><br><span class="line">159</span><br><span class="line">160</span><br><span class="line">161</span><br><span class="line">162</span><br><span class="line">163</span><br><span class="line">164</span><br><span class="line">165</span><br><span class="line">166</span><br><span class="line">167</span><br><span class="line">168</span><br><span class="line">169</span><br><span class="line">170</span><br><span class="line">171</span><br><span class="line">172</span><br><span class="line">173</span><br><span class="line">174</span><br><span class="line">175</span><br><span class="line">176</span><br><span class="line">177</span><br><span class="line">178</span><br><span class="line">179</span><br><span class="line">180</span><br><span class="line">181</span><br><span class="line">182</span><br><span class="line">183</span><br><span class="line">184</span><br><span class="line">185</span><br><span class="line">186</span><br><span class="line">187</span><br><span class="line">188</span><br><span class="line">189</span><br><span class="line">190</span><br><span class="line">191</span><br><span class="line">192</span><br><span class="line">193</span><br><span class="line">194</span><br><span class="line">195</span><br><span class="line">196</span><br><span class="line">197</span><br><span class="line">198</span><br><span class="line">199</span><br><span class="line">200</span><br><span class="line">201</span><br><span class="line">202</span><br><span class="line">203</span><br><span class="line">204</span><br><span class="line">205</span><br><span class="line">206</span><br><span class="line">207</span><br><span class="line">208</span><br><span class="line">209</span><br><span class="line">210</span><br><span class="line">211</span><br><span class="line">212</span><br><span class="line">213</span><br><span class="line">214</span><br><span class="line">215</span><br><span class="line">216</span><br><span class="line">217</span><br><span class="line">218</span><br><span class="line">219</span><br><span class="line">220</span><br><span class="line">221</span><br><span class="line">222</span><br><span class="line">223</span><br><span class="line">224</span><br><span class="line">225</span><br><span class="line">226</span><br><span class="line">227</span><br><span class="line">228</span><br><span class="line">229</span><br><span class="line">230</span><br><span class="line">231</span><br><span class="line">232</span><br><span class="line">233</span><br><span class="line">234</span><br><span class="line">235</span><br><span class="line">236</span><br><span class="line">237</span><br><span class="line">238</span><br><span class="line">239</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">package</span> com.springboot.text;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> com.hankcs.hanlp.HanLP;</span><br><span class="line"><span class="keyword">import</span> com.hankcs.hanlp.dictionary.stopword.CoreStopWordDictionary;</span><br><span class="line"><span class="keyword">import</span> com.hankcs.hanlp.seg.common.Term;</span><br><span class="line"><span class="keyword">import</span> com.springboot.commonUtil.StringUtils;</span><br><span class="line"></span><br><span class="line"><span class="keyword">import</span> java.math.BigInteger;</span><br><span class="line"><span class="keyword">import</span> java.util.List;</span><br><span class="line"></span><br><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment"> * 提供SimHash相关的计算服务</span></span><br><span class="line"><span class="comment"> */</span></span><br><span class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SimHashService</span> </span>&#123;</span><br><span class="line"></span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> BigInteger BIGINT_0 = BigInteger.valueOf(<span class="number">0</span>);</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> BigInteger BIGINT_1 = BigInteger.valueOf(<span class="number">1</span>);</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> BigInteger BIGINT_2 = BigInteger.valueOf(<span class="number">2</span>);</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> BigInteger BIGINT_1000003 = BigInteger.valueOf(<span class="number">1000003</span>);</span><br><span class="line">    <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> BigInteger BIGINT_2E64M1 = BIGINT_2.pow(<span class="number">64</span>).subtract(BIGINT_1);</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 计算一段正文的simHash</span></span><br><span class="line"><span class="comment">     * 警告：修改该方法，修改HanLp分词结果（如新增停用词），会导致计算出的SimHash发生变化。</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> text 需要计算的文本</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回simHash，64位的0-1字符串。如果文本过短则返回null。</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">get</span><span class="params">(String text)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (text == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        text = StringUtils.removeHtml(text); <span class="comment">// return Jsoup.parse(text).text();</span></span><br><span class="line">        <span class="keyword">int</span> sumWeight = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">int</span> maxWeight = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">int</span>[] bits = <span class="keyword">new</span> <span class="keyword">int</span>[<span class="number">64</span>];</span><br><span class="line">        List&lt;Term&gt; termList = HanLP.segment(text);</span><br><span class="line">        <span class="keyword">for</span> (Term term : termList) &#123;</span><br><span class="line">            String word = term.word;</span><br><span class="line">            String nature = term.nature.toString();</span><br><span class="line">            <span class="keyword">if</span> (nature.startsWith(<span class="string">&quot;w&quot;</span>) || CoreStopWordDictionary.contains(word)) &#123;</span><br><span class="line">                <span class="comment">// 去除标点符号和停用词</span></span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            BigInteger wordHash = getWordHash(word);</span><br><span class="line">            <span class="keyword">int</span> wordWeight = getWordWeight(word);</span><br><span class="line">            <span class="keyword">if</span> (wordWeight == <span class="number">0</span>) &#123;</span><br><span class="line">                <span class="keyword">continue</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            sumWeight += wordWeight;</span><br><span class="line">            <span class="keyword">if</span> (maxWeight &lt; wordWeight) &#123;</span><br><span class="line">                maxWeight = wordWeight;</span><br><span class="line">            &#125;</span><br><span class="line">            <span class="comment">// 逐位将计算好的词哈希乘以权重，记录到保存用的数组上。</span></span><br><span class="line">            <span class="comment">// 如果该位哈希为1，则加上对应的权重，反之减去对应的权重。</span></span><br><span class="line">            <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">64</span>; i++) &#123;</span><br><span class="line">                BigInteger bitMask = BIGINT_1.shiftLeft(<span class="number">63</span> - i);</span><br><span class="line">                <span class="keyword">if</span> (wordHash.and(bitMask).signum() != <span class="number">0</span>) &#123;</span><br><span class="line">                    bits[i] += wordWeight;</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    bits[i] -= wordWeight;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">if</span> (<span class="number">3</span> * maxWeight &gt;= sumWeight || sumWeight &lt; <span class="number">20</span>) &#123;</span><br><span class="line">            <span class="comment">// 文本太短导致哈希不充分，拒绝返回结果（否则可能会有太多碰撞的文档，导致查询性能低下）</span></span><br><span class="line">            <span class="comment">// 暂时定为至少需要凑齐3个大词才允许返回结果</span></span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line"></span><br><span class="line">        <span class="comment">// 将保存的位统计结果降维，处理成0/1字符串并返回</span></span><br><span class="line">        StringBuilder simHashBuilder = <span class="keyword">new</span> StringBuilder();</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; <span class="number">64</span>; i++) &#123;</span><br><span class="line">            <span class="keyword">if</span> (bits[i] &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                simHashBuilder.append(<span class="string">&quot;1&quot;</span>);</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                simHashBuilder.append(<span class="string">&quot;0&quot;</span>);</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> simHashBuilder.toString();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取一个单词的哈希值</span></span><br><span class="line"><span class="comment">     * 警告：修改该方法会导致计算出的SimHash发生变化。</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> word 输入的单词</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回哈希</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> BigInteger <span class="title">getWordHash</span><span class="params">(String word)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (StringUtils.isBlank(word)) &#123;</span><br><span class="line">            <span class="keyword">return</span> BIGINT_0;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">char</span>[] sourceArray = word.toCharArray();</span><br><span class="line">        <span class="comment">// 经过调优，发现左移位数为11-12左右最优</span></span><br><span class="line">        <span class="comment">// 在哈希词语主要为长度2的中文词时，可以避免高位哈希出现明显偏向</span></span><br><span class="line">        <span class="comment">// 反之，如果左移位数太大，则低位哈希将只和词语最后一个字相关</span></span><br><span class="line">        BigInteger hash = BigInteger.valueOf(((<span class="keyword">long</span>) sourceArray[<span class="number">0</span>]) &lt;&lt; <span class="number">12</span>);</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">char</span> ch : sourceArray) &#123;</span><br><span class="line">            BigInteger chInt = BigInteger.valueOf(ch);</span><br><span class="line">            hash = hash.multiply(BIGINT_1000003).xor(chInt).and(BIGINT_2E64M1);</span><br><span class="line">        &#125;</span><br><span class="line">        hash = hash.xor(BigInteger.valueOf(word.length()));</span><br><span class="line">        <span class="keyword">return</span> hash;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 获取一个单词的权重。</span></span><br><span class="line"><span class="comment">     * 警告：修改该方法会导致计算出的SimHash发生变化。</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> word 输入单词</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 输出权重</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">getWordWeight</span><span class="params">(String word)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (StringUtils.isBlank(word)) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="number">0</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">int</span> length = word.length();</span><br><span class="line">        <span class="keyword">if</span> (length == <span class="number">1</span>) &#123;</span><br><span class="line">            <span class="comment">// 只有长度为1的词，哈希后位数不够（40位左右），所以权重必须很低，否则容易导致高位哈希全部为0。</span></span><br><span class="line">            <span class="keyword">return</span> <span class="number">1</span>;</span><br><span class="line">        &#125; <span class="keyword">else</span> <span class="keyword">if</span> (word.charAt(<span class="number">0</span>) &gt;= <span class="number">0x3040</span>) &#123;</span><br><span class="line">            <span class="keyword">if</span> (length == <span class="number">2</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="number">8</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="number">16</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">            <span class="keyword">if</span> (length == <span class="number">2</span>) &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="number">2</span>;</span><br><span class="line">            &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                <span class="keyword">return</span> <span class="number">4</span>;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 截取SimHash的一部分，转换为short对象</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHash 原始SimHash字符串，64位0/1字符</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> part    需要截取的部分编号</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回Short值</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> Short <span class="title">toShort</span><span class="params">(String simHash, <span class="keyword">int</span> part)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (simHash == <span class="keyword">null</span> || part &lt; <span class="number">0</span> || part &gt; <span class="number">3</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> <span class="keyword">null</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">int</span> startBit = part * <span class="number">16</span>;</span><br><span class="line">        <span class="keyword">int</span> endBit = (part + <span class="number">1</span>) * <span class="number">16</span>;</span><br><span class="line">        <span class="keyword">return</span> Integer.valueOf(simHash.substring(startBit, endBit), <span class="number">2</span>).shortValue();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 将四段Short格式的SimHash拼接成字符串</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashA simHashA，最高位</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashB simHashB</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashC simHashC</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashD simHashD，最低位</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回64位0/1格式的SimHash</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">toSimHash</span><span class="params">(Short simHashA, Short simHashB, Short simHashC, Short simHashD)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">return</span> toSimHash(simHashA) + toSimHash(simHashB) + toSimHash(simHashC) + toSimHash(simHashD);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 将一段Short格式的SimHash拼接成字符串</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashX 需要转换的Short格式SimHash</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回16位0/1格式的SimHash</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> String <span class="title">toSimHash</span><span class="params">(Short simHashX)</span> </span>&#123;</span><br><span class="line">        StringBuilder simHashBuilder = <span class="keyword">new</span> StringBuilder(Integer.toString(simHashX &amp; <span class="number">65535</span>, <span class="number">2</span>));</span><br><span class="line">        <span class="keyword">int</span> fill0Count = <span class="number">16</span> - simHashBuilder.length();</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; fill0Count; i++) &#123;</span><br><span class="line">            simHashBuilder.insert(<span class="number">0</span>, <span class="string">&quot;0&quot;</span>);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> simHashBuilder.toString();</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 比较两组SimHash（一组为64位0/1字符串，一组为四组Short），计算汉明距离</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHash  待比较的SimHash（X），64位0/1字符串</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashA 待比较的SimHash（Y），Short格式，最高位</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashB 待比较的SimHash（Y），Short格式</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashC 待比较的SimHash（Y），Short格式</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashD 待比较的SimHash（Y），Short格式，最低位</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回汉明距离</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">hammingDistance</span><span class="params">(String simHash, Short simHashA, Short simHashB, Short simHashC, Short simHashD)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (simHash == <span class="keyword">null</span> || simHashA == <span class="keyword">null</span> || simHashB == <span class="keyword">null</span> || simHashC == <span class="keyword">null</span> || simHashD == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">int</span> hammingDistance = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">for</span> (<span class="keyword">int</span> part = <span class="number">0</span>; part &lt; <span class="number">4</span>; part++) &#123;</span><br><span class="line">            Short simHashX = toShort(simHash, part);</span><br><span class="line">            Short simHashY = <span class="keyword">null</span>;</span><br><span class="line">            <span class="keyword">switch</span> (part) &#123;</span><br><span class="line">                <span class="keyword">case</span> <span class="number">0</span>:</span><br><span class="line">                    simHashY = simHashA;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                <span class="keyword">case</span> <span class="number">1</span>:</span><br><span class="line">                    simHashY = simHashB;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                <span class="keyword">case</span> <span class="number">2</span>:</span><br><span class="line">                    simHashY = simHashC;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                <span class="keyword">case</span> <span class="number">3</span>:</span><br><span class="line">                    simHashY = simHashD;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">            &#125;</span><br><span class="line">            hammingDistance += hammingDistance(simHashX, simHashY);</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> hammingDistance;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 比较两个Short格式的SimHash的汉明距离</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashX 待比较的SimHashX</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashY 待比较的SimHashY</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回汉明距离</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">hammingDistance</span><span class="params">(Short simHashX, Short simHashY)</span> </span>&#123;</span><br><span class="line">        <span class="keyword">if</span> (simHashX == <span class="keyword">null</span> || simHashY == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> -<span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">int</span> hammingDistance = <span class="number">0</span>;</span><br><span class="line">        <span class="keyword">int</span> xorResult = (simHashX ^ simHashY) &amp; <span class="number">65535</span>;</span><br><span class="line"></span><br><span class="line">        <span class="keyword">while</span> (xorResult != <span class="number">0</span>) &#123;</span><br><span class="line">            xorResult = xorResult &amp; (xorResult - <span class="number">1</span>);</span><br><span class="line">            hammingDistance += <span class="number">1</span>;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> hammingDistance;</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>ES索引中需要新增4个SimHash相关的字段：</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">    <span class="attr">&quot;simHashA&quot;</span>:&#123;</span><br><span class="line">        <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;short&quot;</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;simHashB&quot;</span>:&#123;</span><br><span class="line">        <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;short&quot;</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;simHashC&quot;</span>:&#123;</span><br><span class="line">        <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;short&quot;</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;simHashD&quot;</span>:&#123;</span><br><span class="line">        <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;short&quot;</span></span><br><span class="line">    &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<p>最后是ES查询逻辑，根据传入的SimHash，先使用ES找到至少一组SimHash相等的文档，然后在Java代码中比较剩下三组是否满足要求。</p>
+<figure class="highlight java"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 根据SimHash，查询相似的文章。</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> indexNames 需要查询的索引名称（允许多个）</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashA   simHashA的值</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashB   simHashB的值</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashC   simHashC的值</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHashD   simHashD的值</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回相似文章RowKey列表。</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> List&lt;String&gt; <span class="title">searchBySimHash</span><span class="params">(String indexNames, Short simHashA, <span class="keyword">short</span> simHashB, <span class="keyword">short</span> simHashC, <span class="keyword">short</span> simHashD)</span> </span>&#123;</span><br><span class="line">        String simHash = SimHashService.toSimHash(simHashA, simHashB, simHashC, simHashD);</span><br><span class="line">        <span class="keyword">return</span> searchBySimHash(indexNames, simHash);</span><br><span class="line">    &#125;</span><br><span class="line"></span><br><span class="line">    <span class="comment">/**</span></span><br><span class="line"><span class="comment">     * 根据SimHash，查询相似的文章。</span></span><br><span class="line"><span class="comment">     *</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> indexNames 需要查询的索引名称（允许多个）</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@param</span> simHash    需要查询的SimHash (格式：64位二进制字符串)</span></span><br><span class="line"><span class="comment">     * <span class="doctag">@return</span> 返回相似文章RowKey列表。</span></span><br><span class="line"><span class="comment">     */</span></span><br><span class="line">    <span class="function"><span class="keyword">public</span> List&lt;String&gt; <span class="title">searchBySimHash</span><span class="params">(String indexNames, String simHash)</span> </span>&#123;</span><br><span class="line">        List&lt;String&gt; resultList = <span class="keyword">new</span> ArrayList&lt;&gt;();</span><br><span class="line">        <span class="keyword">if</span> (simHash == <span class="keyword">null</span>) &#123;</span><br><span class="line">            <span class="keyword">return</span> resultList;</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">try</span> &#123;</span><br><span class="line">            String scrollId = <span class="string">&quot;&quot;</span>;</span><br><span class="line">            <span class="keyword">while</span> (<span class="keyword">true</span>) &#123;</span><br><span class="line">                <span class="keyword">if</span> (scrollId == <span class="keyword">null</span>) &#123;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                &#125;</span><br><span class="line">                SearchResponse response = <span class="keyword">null</span>;</span><br><span class="line">                <span class="keyword">if</span> (scrollId.isEmpty()) &#123;</span><br><span class="line">                    <span class="comment">// 首次请求，正常查询</span></span><br><span class="line">                    SearchRequest request = <span class="keyword">new</span> SearchRequest(indexNames.split(<span class="string">&quot;,&quot;</span>));</span><br><span class="line">                    BoolQueryBuilder bqBuilder = QueryBuilders.boolQuery();</span><br><span class="line">                    bqBuilder.should(QueryBuilders.termQuery(<span class="string">&quot;simHashA&quot;</span>, SimHashService.toShort(simHash, <span class="number">0</span>)));</span><br><span class="line">                    bqBuilder.should(QueryBuilders.termQuery(<span class="string">&quot;simHashB&quot;</span>, SimHashService.toShort(simHash, <span class="number">1</span>)));</span><br><span class="line">                    bqBuilder.should(QueryBuilders.termQuery(<span class="string">&quot;simHashC&quot;</span>, SimHashService.toShort(simHash, <span class="number">2</span>)));</span><br><span class="line">                    bqBuilder.should(QueryBuilders.termQuery(<span class="string">&quot;simHashD&quot;</span>, SimHashService.toShort(simHash, <span class="number">3</span>)));</span><br><span class="line">                    SearchSourceBuilder sourceBuilder = <span class="keyword">new</span> SearchSourceBuilder().size(<span class="number">10000</span>);</span><br><span class="line">                    sourceBuilder.query(bqBuilder);</span><br><span class="line">                    sourceBuilder.from(<span class="number">0</span>);</span><br><span class="line">                    sourceBuilder.size(<span class="number">10000</span>);</span><br><span class="line">                    sourceBuilder.timeout(TimeValue.timeValueSeconds(<span class="number">60</span>));</span><br><span class="line">                    sourceBuilder.fetchSource(<span class="keyword">new</span> String[]&#123;<span class="string">&quot;hId&quot;</span>, <span class="string">&quot;simHashA&quot;</span>, <span class="string">&quot;simHashB&quot;</span>, <span class="string">&quot;simHashC&quot;</span>, <span class="string">&quot;simHashD&quot;</span>&#125;, <span class="keyword">new</span> String[]&#123;&#125;);</span><br><span class="line">                    sourceBuilder.sort(<span class="string">&quot;publishDate&quot;</span>, SortOrder.DESC);</span><br><span class="line">                    request.source(sourceBuilder);</span><br><span class="line">                    request.scroll(TimeValue.timeValueSeconds(<span class="number">60</span>));</span><br><span class="line">                    response = client.search(request, RequestOptions.DEFAULT);</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    <span class="comment">// 之后请求，走游标查询</span></span><br><span class="line">                    SearchScrollRequest searchScrollRequest = <span class="keyword">new</span> SearchScrollRequest(scrollId).scroll(TimeValue.timeValueMinutes(<span class="number">10</span>));</span><br><span class="line">                    response = client.scroll(searchScrollRequest, RequestOptions.DEFAULT);</span><br><span class="line">                &#125;</span><br><span class="line">                <span class="keyword">if</span> (response != <span class="keyword">null</span> &amp;&amp; response.getHits().getHits().length &gt; <span class="number">0</span>) &#123;</span><br><span class="line">                    <span class="comment">// 查到的记录必然有一组simHashX与输入相同，但需要合并确认总数是否小于阈值</span></span><br><span class="line">                    <span class="comment">// 很可能有几万的命中，但最终过滤完只剩下几条数据，最终留下ID</span></span><br><span class="line">                    <span class="keyword">for</span> (SearchHit hit : response.getHits().getHits()) &#123;</span><br><span class="line">                        Map&lt;String, Object&gt; sourceAsMap = hit.getSourceAsMap();</span><br><span class="line">                        String hId = String.valueOf(sourceAsMap.get(<span class="string">&quot;hId&quot;</span>));</span><br><span class="line">                        Short simHashA = Short.parseShort(sourceAsMap.get(<span class="string">&quot;simHashA&quot;</span>).toString());</span><br><span class="line">                        Short simHashB = Short.parseShort(sourceAsMap.get(<span class="string">&quot;simHashB&quot;</span>).toString());</span><br><span class="line">                        Short simHashC = Short.parseShort(sourceAsMap.get(<span class="string">&quot;simHashC&quot;</span>).toString());</span><br><span class="line">                        Short simHashD = Short.parseShort(sourceAsMap.get(<span class="string">&quot;simHashD&quot;</span>).toString());</span><br><span class="line">                        <span class="keyword">int</span> hammingDistance = SimHashService.hammingDistance(simHash, simHashA, simHashB, simHashC, simHashD);</span><br><span class="line">                        <span class="keyword">if</span> (hammingDistance &lt; <span class="number">4</span>) &#123;</span><br><span class="line">                            System.out.println(hammingDistance + <span class="string">&quot;\t&quot;</span> + hId);</span><br><span class="line">                            resultList.add(sourceAsMap.get(<span class="string">&quot;hId&quot;</span>).toString());</span><br><span class="line">                        &#125;</span><br><span class="line">                    &#125;</span><br><span class="line">                    scrollId = response.getScrollId();</span><br><span class="line">                &#125; <span class="keyword">else</span> &#123;</span><br><span class="line">                    <span class="keyword">break</span>;</span><br><span class="line">                &#125;</span><br><span class="line">            &#125;</span><br><span class="line">        &#125; <span class="keyword">catch</span> (IOException e) &#123;</span><br><span class="line">            e.printStackTrace();</span><br><span class="line">        &#125;</span><br><span class="line">        <span class="keyword">return</span> resultList;</span><br><span class="line">    &#125;</span><br></pre></td></tr></table></figure>
+
+        <p class="suffix-end">__END__</p>
+        <div class="suffix-box">
+            <div class="suffix-box-left">
+                <img src="https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg" alt="Lustm">
+            </div>
+            <div class="suffix-box-right">
+                <span class="suffix-box-title">文章作者</span>：Lustm
+                <br>
+                <span class="suffix-box-title">文章出处</span>：<a href="/2021/12/01/Java%E6%93%8D%E4%BD%9CElasticSearch%E5%AE%9E%E7%8E%B0SimHash%E6%AF%94%E8%BE%83%E6%96%87%E7%AB%A0%E7%9B%B8%E4%BC%BC%E5%BA%A6/" target="_blank">Java操作ElasticSearch实现SimHash比较文章相似度</a>
+                <br>
+                <span class="suffix-box-title">作者签名</span>：简单地活着, 肆意又精彩.
+                <br>
+                <span class="suffix-box-title">关于主题</span>：<a href="https://github.com/first19326/Hexo-LiveForCode" target="_blank">Hexo - Live For Code</a>
+                <br>
+                <span class="suffix-box-title">版权声明</span>：文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" title="BY-NC-SA" target="_blank">BY-NC-SA</a> 许可协议，转载请注明出处
+                <br>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+    </div>
+    <div class="article-footer">
+        
+            <div class="category">
+                分类：
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/">搜索引擎</a>
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/elasticsearch/">elasticsearch</a>
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/elasticsearch/%E6%96%87%E6%9C%AC%E6%9F%A5%E9%87%8D/">文本查重</a>
+                
+            </div>
+        
+        
+            <div class="tag">
+                标签：
+                
+                    <a href="/tags/elasticsearch/">elasticsearch</a>
+                
+                    <a href="/tags/simhash/">simhash</a>
+                
+                    <a href="/tags/%E7%AE%97%E6%B3%95/">算法</a>
+                
+            </div>
+        
+        <div class="article-prev-next">
+            
+                <a href="/2021/12/01/Elasticsearch%E8%87%AA%E5%AE%9A%E4%B9%89%E5%88%86%E8%AF%8D%E5%99%A8/" class="prev-prefix">« </a> 上一篇：    <a href="/2021/12/01/Elasticsearch%E8%87%AA%E5%AE%9A%E4%B9%89%E5%88%86%E8%AF%8D%E5%99%A8/" title="发布于 2021-12-01 05:24">Elasticsearch自定义分词器</a>
+                <br>
+            
+            
+                <a href="/2021/12/01/Elasticsearch%E5%A6%82%E4%BD%95%E8%AE%A9%E4%B8%80%E4%B8%AA%E5%AD%97%E6%AE%B5%E5%90%8C%E6%97%B6%E6%94%AF%E6%8C%81%E7%B2%BE%E7%A1%AE%E5%8C%B9%E9%85%8D%E5%92%8C%E6%A8%A1%E7%B3%8A%E6%A3%80%E7%B4%A2/" class="next-prefix">» </a> 下一篇：    <a href="/2021/12/01/Elasticsearch%E5%A6%82%E4%BD%95%E8%AE%A9%E4%B8%80%E4%B8%AA%E5%AD%97%E6%AE%B5%E5%90%8C%E6%97%B6%E6%94%AF%E6%8C%81%E7%B2%BE%E7%A1%AE%E5%8C%B9%E9%85%8D%E5%92%8C%E6%A8%A1%E7%B3%8A%E6%A3%80%E7%B4%A2/" title="发布于 2021-12-01 05:06">Elasticsearch如何让一个字段同时支持精确匹配和模糊检索</a>
+            
+        </div>
+    </div>
+    
+    <div class="article-comments">
+        <div class="comments-title">
+            评论列表
+        </div>
+        <div class="comments-content">
+        </div>
+    </div>
+
+</div>
+
+    </div>
+</div>
+    <div id="footer"></div>
+    <div id="sidebar">
+    <div class="menu-wrap" style="display:none;">
+        <nav class="menu">
+            <div class="menu-introduce"> 
+                <div class="introduce-avatar"></div> 
+                <div class="introduce-info"> 
+                    <div class="introduce-user"><span></span></div>        
+                </div> 
+            </div> 
+            <div class="menu-list">
+                <ul></ul> 
+            </div> 
+            <div class="menu-link"></div> 
+        </nav>
+        <button class="menu-button-close"></button>
+        <div class="morph-shape" id="morph-shape" data-morph-open="M-7.312,0H15c0,0,66,113.339,66,399.5C81,664.006,15,800,15,800H-7.312V0z;M-7.312,0H100c0,0,0,113.839,0,400c0,264.506,0,400,0,400H-7.312V0z">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 800" preserveAspectRatio="none">
+                <path d="M-7.312,0H0c0,0,0,113.839,0,400c0,264.506,0,400,0,400h-7.312V0z"/>
+            </svg>
+        </div>
+    </div>
+    <button class="menu-button-open">MENU</button>
+    <div class="menu-cover"></div>
+</div>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js"></script>
+<div class="search-window">
+    <div class="search-content">
+        <div class="search-content-icon">
+            <i class="iconfont icon-search"></i>
+        </div>
+        <div id="search-input" class="search-input"></div>
+    </div>
+
+    <div class="search-scroll">
+        <div class="search-result">
+            <div id="search-stats" class="search-stats"></div>
+            <div id="search-hits"></div>
+            <div id="search-pagination" class="search-pagination"></div>
+        </div>
+    </div>
+
+    <span class="search-close-icon">
+        <i class="iconfont icon-close"></i>
+    </span>
+</div>
+    <div id="tools">
+    <div class="progressbar-top"></div>
+
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css">
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js"></script>
+        <meting-js id="3778678" lrcshow="false" server="netease" type="playlist" fixed="true" autoplay="false" loop="all" order="random" preload="auto" volume="0.67" mutex="true"></meting-js>
+    
+    
+    <div class="wrap-right"></div>
+    <div class="loading"></div>
+</div>
+    <script>
+    window.config = {
+        GitHubUserName     : 'lustm',
+        GitHubRepositories : 'hexo-source',
+
+        BlogUser      : 'Lustm',
+        BlogAvatar    : 'https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg',
+        BlogStartDate : '2021-12-23',
+
+        WebsiteTitleBlur         : '(◍´꒳`◍) Hi, come back quickly',
+        WebsiteTitleBlurTimeOut  : 500,
+        WebsiteTitleFocus        : '(*´∇｀*) Welcome back!',
+        WebsiteTitleFocusTimeOut : 1000,
+        WebsiteFavicon           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/logo.png',
+
+        ProgressBar: {
+            id       : 'topProgressBar',
+            color    : '#77B6FF',
+            height   : '2px',
+            duration : 0.2
+        },
+
+        Loading: {
+            rebound: {
+                tension  : 16,
+                friction : 5
+            },
+            spinner: {
+                id     : 'spinner',
+                radius : 90,
+                sides  : 3,
+                depth  : 4,
+                colors : {
+                    background : '#F0F0F0',
+                    stroke     : '#272633',
+                    base       : '',
+                    child      : '#272633'
+                },
+                alwaysForward : true,
+                restAt        : 0.5,
+                renderBase    : false
+            }
+        },
+
+        HomeHeaderAnimationRendered : true,
+        HomeHeaderAnimation         : {
+            radius      : 15,
+            density     : 0.2,
+            color       : 'rgba(255, 255, 255, .2)',
+            clearOffset : 0.3
+        },
+
+        ArticleHeaderAnimationRendered : false,
+        ArticleHeaderAnimation         : {
+            triW                  : 14,
+            triH                  : 20,
+            neighbours            : [
+                
+                    'side',
+                
+                    'top',
+                
+                    'bottom',
+                
+            ],
+            speedTrailAppear      : 0.1,
+            speedTrailDisappear   : 0.1,
+            speedTriOpen          : 1,
+            trailMaxLength        : 30,
+            trailIntervalCreation : 100,
+            delayBeforeDisappear  : 2,
+            colors                : [
+                
+                    '#96EDA6',
+                
+                    '#5BC6A9',
+                
+                    '#38668C',
+                
+                    '#374D84',
+                
+                    '#BED5CB',
+                
+                    '#62ADC6',
+                
+                    '#8EE5DE',
+                
+                    '#304E7B',
+                
+            ]
+        },
+
+        BackAnimationRendered          : true,
+        IEBrowserBackAnimationRendered : false,
+        BackAnimation                  : {
+            colorSaturation  : '60%',
+            colorBrightness  : '50%',
+            colorAlpha       : 0.5,
+            colorCycleSpeed  : 5,
+            verticalPosition : 'random',
+            horizontalSpeed  : 200,
+            ribbonCount      : 3,
+            strokeSize       : 0,
+            parallaxAmount   : -0.2,
+            animateSections  : true
+        },
+
+        HomeHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpg',
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpeg',
+            
+        ],
+        HomeBannerText  : '',
+
+        ArticleHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/article.jpg',
+            
+        ],
+
+        OtherBannerText : '',
+
+        MenuList : [
+            
+                {
+                    name   : '首页',
+                    href   : '/',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '标签',
+                    href   : '/tag',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '分类',
+                    href   : '/category',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '归档',
+                    href   : '/archive',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '赞赏',
+                    href   : '/donate',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '关于',
+                    href   : '/about',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '订阅',
+                    href   : '/atom.xml',    
+                    target : '_blank',
+                    class  : ''
+                },
+            
+                {
+                    name   : '搜索',
+                    href   : '',    
+                    target : '',
+                    class  : 'search'
+                },
+            
+                {
+                    name   : '留言板',
+                    href   : '/comment',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '友情链接',
+                    href   : '/friend',    
+                    target : '',
+                    class  : ''
+                },
+            
+        ],
+        MenuLink : [
+            
+                
+                    {
+                        icon : 'icon-weibo', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-wechat', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-qq', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-github', 
+                        url  : 'https://github.com/lustm'
+                    },
+                
+            
+        ],
+
+        FooterStyle : 2,
+        BottomText  : {
+            icon    : 'like-fill',
+            left    : '人生若只如初见',
+            right   : '何事秋风悲画扇'
+        },
+        ThemeInfo   : true,
+
+        ConsoleList : [
+            
+                
+                    [
+                        
+                            
+                                'Based on cnblogs theme SimpleMemory.',
+                            
+                                '',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'SimpleMemory Author:',
+                            
+                                'BNDong',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'Theme:',
+                            
+                                'LiveForCode',
+                            
+                        
+                    ],
+                
+            
+        ],
+
+        FontIconExtend : '',
+
+        Donate : {
+            paypal  : '',
+            bitcoin : '',
+            alipay  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/alipay.png',
+            wechat  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/wechat.png'
+        },
+
+        Code : {
+            style : 'normal'
+        },  
+
+        Search : {
+            applicationID : 'BX367M4TD2',
+            apiKey        : '522ed64d7cc9964a9fe64ad7f15b66bf',
+            indexName     : 'hexo',
+            hits          : {
+                page : 10
+            },
+            labels        : {
+                placeholder : '搜索',
+                empty       : '未发现与 「${query}」 相关的内容',
+                stats       : '${hits} 条相关条目，使用了 ${time} 毫秒',
+            }
+        }, 
+
+        Valine : {
+            switch         : true,
+            el             : '.comments-content',
+            appId          : 'vU2CPQHyaPOyOheG1dc6zkOt-MdYXbMMI',
+            appKey         : 'xAx3L0LGorEGIyPEjqhcc4nb',
+            placeholder    : '你是我一生只会遇见一次的惊喜...',
+            avatar         : 'mm',
+            meta           : 'nick,mail,link',
+            requiredFields : 'nick,mail',
+            pageSize       : 5,
+            lang           : 'zh-cn',
+            visitor        : true,
+            enableQQ       : true
+        },
+
+        Tocbot : {
+            switch                : true,
+            tocSelector           : '.toc',
+            contentSelector       : '.article-body',
+            headingSelector       : 'h1, h2, h3, h4, h5',
+            headingsOffset        : 0,
+            scrollSmooth          : true,
+            scrollSmoothOffset    : -5,
+            positionFixedSelector : '.toc',
+            positionFixedClass    : 'toc-fixed',
+            fixedSidebarOffset    : '',
+        },
+
+        Require : {
+            baseUrl     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/',
+            waitSeconds : 100
+        },
+
+        Music : {
+            type : 'Meting'
+        },
+        APlayer : {
+            container : '.aplayer',
+            fixed     : true,
+            autoplay  : false,
+            loop      : 'all',
+            order     : 'random',
+            preload   : 'auto',
+            volume    : 0.67,
+            mutex     : true,
+            lrcType   : 3,
+            audio     : [
+                
+                    {
+                        name   : 'aLIEz',
+                        artist : 'mizuki（瑞葵）',
+                        cover  : '/music/cover/aLIEz.jpg',
+                        url    : '/music/song/aLIEz.mp3',
+                        lrc    : '/music/lrc/aLIEz.lrc'
+                    },
+                
+                    {
+                        name   : 'Endless Tears',
+                        artist : 'CLIFF EDGE',
+                        cover  : '/music/cover/Endless Tears.jpg',
+                        url    : '/music/song/Endless Tears.mp3',
+                        lrc    : '/music/lrc/Endless Tears.lrc'
+                    },
+                
+                    {
+                        name   : 'Miracle',
+                        artist : 'Cascada',
+                        cover  : '/music/cover/Miracle.jpg',
+                        url    : '/music/song/Miracle.mp3',
+                        lrc    : '/music/lrc/Miracle.lrc'
+                    },
+                
+                    {
+                        name   : 'Roll The Dice',
+                        artist : '高珊',
+                        cover  : '/music/cover/Roll The Dice.jpg',
+                        url    : '/music/song/Roll The Dice.mp3',
+                        lrc    : '/music/lrc/Roll The Dice.lrc'
+                    },
+                
+                    {
+                        name   : 'See You Again',
+                        artist : 'Charlie Puth, Wiz Khalifa',
+                        cover  : '/music/cover/See You Again.jpg',
+                        url    : '/music/song/See You Again.mp3',
+                        lrc    : '/music/lrc/See You Again.lrc'
+                    },
+                
+                    {
+                        name   : 'Traveling Light',
+                        artist : 'Joel Hanson, Sara Groves',
+                        cover  : '/music/cover/Traveling Light.jpg',
+                        url    : '/music/song/Traveling Light.mp3',
+                        lrc    : '/music/lrc/Traveling Light.lrc'
+                    },
+                
+                    {
+                        name   : '痴心绝对',
+                        artist : '李圣杰',
+                        cover  : '/music/cover/痴心绝对.jpg',
+                        url    : '/music/song/痴心绝对.mp3',
+                        lrc    : '/music/lrc/痴心绝对.lrc'
+                    },
+                
+                    {
+                        name   : '好想大声说爱你',
+                        artist : 'BAAD（バード）',
+                        cover  : '/music/cover/好想大声说爱你.jpg',
+                        url    : '/music/song/好想大声说爱你.mp3',
+                        lrc    : '/music/lrc/好想大声说爱你.lrc'
+                    },
+                
+            ]
+        },
+        Meting : {
+            id       : '3778678', 
+            lrcshow  : false, 
+            server   : 'netease', 
+            type     : 'playlist', 
+            fixed    : true, 
+            autoplay : false, 
+            loop     : 'all', 
+            order    : 'random', 
+            preload  : 'auto', 
+            volume   : 0.67, 
+            mutex    : true
+        },
+
+        Mouse : {
+            enable  : true,
+            options : {
+                size  : 6,
+                sizeF : 24
+            }
+        },
+
+        LazyLoad : {
+            default : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/lazyload.svg'
+        },
+  
+        Style : {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css',
+            archive          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/archive.css',
+            donate           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/donate.css',
+            fancybox         : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/jquery.fancybox.css',
+            footer           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/footer.css',
+            iconfont         : 'https://at.alicdn.com/t/font_1546312_l3yohatebw.css',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/index.css',
+            menuBubble       : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/menu-bubble.css',
+            page             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/page.css',
+            post             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css',
+            search           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css',
+            tocbot           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/tocbot.css',
+            normal           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css',
+            night            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/night.css',
+            clipboard        : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/clipboard.css'
+        },
+
+        Script: {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js',
+            config           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.config.js',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js',
+            instantSearch    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js',
+            jQuery           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js',
+            loading          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/loading.js',
+            meting           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js',
+            iscroll          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js',
+            require          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.min.js'
+        },
+
+        Font: {
+            LongCang   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css',
+            Monda      : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css',
+            NotoSansSC : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css',
+            Playball   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css',
+            PTMono     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css',
+            RobotoSlab : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css',
+            Rosario    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css',
+            UbuntuMono : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css'
+        },
+
+        Suffix : {
+            about : '简单地活着, 肆意又精彩.'
+        },
+            
+        Theme : {
+            url  : 'https://github.com/first19326/Hexo-LiveForCode',
+            name : 'Hexo - Live For Code'
+        }  
+    };
+</script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js"></script>
+</body>
+</html>

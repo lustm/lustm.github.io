@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, shrink-to-fit=no">
+    <meta name="referrer" content="origin">
+    <meta http-equiv="Cache-Control" content="no-transform">
+    <meta http-equiv="Cache-Control" content="no-siteapp">
+    <title>Elasticsearch的安装和简单使用</title>
+    <link rel="shortcut icon" href="#"/>
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css">
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css">
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css">
+    
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js"></script>
+
+<meta name="generator" content="Hexo 5.4.0"><link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+</head>
+<body>
+    <a id="cover"></a>
+    <div id="header">
+    <div class="header">
+        <div class="vertical">
+            <div class="inner">
+                <h1 class="header-subtitle">Elasticsearch的安装和简单使用</h1>
+                <div class="header-subinfo">
+                    <p class="article-info-text">
+                        <span>
+                            <i class="iconfont icon-time"></i> 发表时间：2021-11-06
+                        </span>
+                        
+                            <span id="/2021/11/06/Elasticsearch的安装和简单使用/" class="leancloud_visitors" data-flag-title="Elasticsearch的安装和简单使用">
+                                <i class="iconfont icon-browse"></i> 阅读：<sapn class="leancloud-visitors-count"></span>
+                            </span>
+                        
+                        <span>
+                            <i class="iconfont icon-interactive"></i> 评论：<span class="valine-comment-count" data-xid="/2021/11/06/Elasticsearch的安装和简单使用/"></span>
+                        </span>  
+                    </p>                 
+                </div>
+            </div>
+        </div>
+        <canvas id="articleHeaderCanvas"></canvas>
+    </div>
+</div>
+    <div id="container">
+    <div id="content">
+        <div id="article">
+    <div class="toc"></div>
+    <div class="article-body">
+        <h2 id="ElasticSearch-简介"><a href="#ElasticSearch-简介" class="headerlink" title="ElasticSearch 简介"></a>ElasticSearch 简介</h2><p>Elasticsearch 是一个基于 <a target="_blank" rel="noopener" href="https://baike.baidu.com/item/Lucene/6753302">Lucene</a> 的搜索服务器。它提供了一个分布式多用户能力的 <a target="_blank" rel="noopener" href="https://baike.baidu.com/item/%E5%85%A8%E6%96%87%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/7847410">全文搜索引擎</a>，基于 RESTful web 接口。Elasticsearch 是用Java语言开发的，并作为 Apache 许可条款下的开放源码发布，是一种流行的企业级搜索引擎。<br>Elasticsearch 是与名为 Logstash 的数据收集和日志解析引擎以及名为 Kibana 的分析和可视化平台一起开发的。这三个产品被设计成一个集成解决方案，称为 “Elastic Stack”（以前称为“ELK stack”）。</p>
+<span id="more"></span>
+
+<h3 id="ElasticSearch-概念介绍"><a href="#ElasticSearch-概念介绍" class="headerlink" title="ElasticSearch 概念介绍"></a>ElasticSearch 概念介绍</h3><p>Elasticsearch 是面向文档型数据库，一条数据在这里就是一个文档。为了理解，可以将Elasticsearch 里存储文档数据和关系型数据库 MySQL 存储数据的概念进行一个类比</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202108/27/33853/k9rgvSqs1M.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">Index</span><br><span class="line">　　类似于mysql数据库中的database</span><br><span class="line">Type</span><br><span class="line">　　类似于mysql数据库中的table表，ES中可以在Index中建立type（table），通过mapping进行映射。</span><br><span class="line">Document</span><br><span class="line">　　由于ES存储的数据是文档型的，一条数据对应一篇文档即相当于mysql数据库中的一行数据row，一个文档中可以有多个字段也就是mysql数据库一行可以有多列。</span><br><span class="line">Field</span><br><span class="line">　　ES中一个文档中对应的多个列与mysql数据库中每一列对应</span><br><span class="line">Mapping</span><br><span class="line">　　可以理解为mysql或者solr中对应的schema，只不过有些时候ES中的mapping增加了动态识别功能，感觉很强大的样子，其实实际生产环境上不建议使用，最好还是开始制定好了对应的schema为主。</span><br><span class="line">Query DSL</span><br><span class="line">　　类似于mysql的sql语句，只不过在ES中是使用的json格式的查询语句，专业术语就叫：QueryDSL</span><br><span class="line">GET/PUT/POST/DELETE</span><br><span class="line">　　分别类似与mysql中的select/update/delete......</span><br></pre></td></tr></table></figure>
+
+<p><code>Elasticsearch 7.X 中, Type 的概念已经被删除了</code> 本文不在讲述</p>
+<ul>
+<li>分片：一个物理机器的性能是有瓶颈的，直接往物理机上存数据，存储数量有上限。es 采用了分片的概念，将海量数据切分成片，每一个分片，存储一部分数据。相当于 MySql 的分库, es 在一整个大的集群里，包含很多节点，每个节点又包含很多分片，这样，海量数据由集群来承载。</li>
+<li>副本（replica）又叫从分片，分片的备份，防止数据丢失。并且当主分片出现物理故障时，从分片顶上去，负责数据的检索等只读请求。从分片的数量可变，不用重新建库。</li>
+</ul>
+<h2 id="Docker-Compose-安装-ElasticSearch"><a href="#Docker-Compose-安装-ElasticSearch" class="headerlink" title="Docker-Compose 安装 ElasticSearch"></a>Docker-Compose 安装 ElasticSearch</h2><p>通过 Docker-compose 进行 ElasticSearch 和 Kibana 整合。本文所用案例在 <a target="_blank" rel="noopener" href="https://gitee.com/lijiafei/dnmp">仓库</a> 已经集成，可根据 项目的 <code>readmi.md</code> 进行 clone 和使用</p>
+<h3 id="集成-ElasticSearch"><a href="#集成-ElasticSearch" class="headerlink" title="集成 ElasticSearch"></a>集成 ElasticSearch</h3><p>docker-compose.yml 文件</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br></pre></td><td class="code"><pre><span class="line">elasticsearch:</span><br><span class="line">    build:</span><br><span class="line">      context: ./services/elasticsearch #所用镜像</span><br><span class="line">      args:</span><br><span class="line">        ELASTICSEARCH_VERSION: $&#123;ELASTICSEARCH_VERSION&#125; #所使用的的版本</span><br><span class="line">        ELASTICSEARCH_PLUGINS: $&#123;ELASTICSEARCH_PLUGINS&#125; #需要安装的插件</span><br><span class="line">    container_name: elasticsearch #容器名</span><br><span class="line">    environment: #设置边来你跟</span><br><span class="line">      - TZ=$TZ # 市区设置</span><br><span class="line">      - discovery.type=single-node #单节点模式</span><br><span class="line">      - &quot;ES_JAVA_OPTS=-Xms512m -Xmx512m&quot; #JVM 内存堆大小</span><br><span class="line">    volumes: #文件映射</span><br><span class="line">      - $&#123;DATA_DIR&#125;/esdata:/usr/share/elasticsearch/data</span><br><span class="line">      - $&#123;ELASTICSEARCH_CONF_FILE&#125;:/usr/share/elasticsearch/config/elasticsearch.yml</span><br><span class="line">      - $&#123;ELASTICSEARCH_IK_CONFIG_FILE&#125;:/usr/share/elasticsearch/config/analysis-ik/IKAnalyzer.cfg.xml #IK 分词器的词库配置文件</span><br><span class="line">      - $&#123;ELASTICSEARCH_IK_DIC&#125;:/usr/share/elasticsearch/config/analysis-ik/my.dic #自定义词库文件</span><br><span class="line"></span><br><span class="line">    hostname: elasticsearch # 主机名</span><br><span class="line">    restart: always</span><br><span class="line">    ports:</span><br><span class="line">      - &quot;$&#123;ELASTICSEARCH_HOST_PORT_C&#125;:9200&quot; # 客户端端口</span><br><span class="line">      - &quot;$&#123;ELASTICSEARCH_HOST_PORT_S&#125;:9300&quot; # 服务端端口</span><br><span class="line">    networks: #docker-compose 配置的网络组</span><br><span class="line">      static-network:</span><br></pre></td></tr></table></figure>
+<p>ElasticSearch 默认安装的 <a target="_blank" rel="noopener" href="https://github.com/medcl/elasticsearch-analysis-ik">IK</a> 分词器，所以先把词库配置文件映射出来，方便自定义词库</p>
+<p>.env 文件</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br></pre></td><td class="code"><pre><span class="line">ELASTICSEARCH_VERSION=7.8.1 # 版本号</span><br><span class="line">ELASTICSEARCH_CONF_FILE=./services/elasticsearch/elasticsearch.yml # es配置文件</span><br><span class="line">ELASTICSEARCH_HOST_PORT_C=9200 #端口</span><br><span class="line">ELASTICSEARCH_HOST_PORT_S=9300 #服务端端口</span><br><span class="line">ELASTICSEARCH_PLUGINS=analysis-ik # es 需要安装的插件</span><br><span class="line">ELASTICSEARCH_IK_CONFIG_FILE=./services/elasticsearch/ik/IKAnalyzer.cfg.xml</span><br><span class="line">ELASTICSEARCH_IK_DIC=./services/elasticsearch/ik/my.dic</span><br></pre></td></tr></table></figure>
+<h3 id="集成-Kibana"><a href="#集成-Kibana" class="headerlink" title="集成 Kibana"></a>集成 Kibana</h3><p>Kibana 是一个开源的分析与可视化平台，设计出来用于和 Elasticsearch 一起使用的。你可以用kibana 搜索、查看存放在 Elasticsearch 中的数据。Elasticsearch、Logstash 和 Kibana 这三个技术就是我们常说的ELK技术栈，可以说这三个技术的组合是大数据领域中一个很巧妙的设计。一种很典型的MVC思想，模型持久层，视图层和控制层。Logstash担任控制层的角色，负责搜集和过滤数据。Elasticsearch担任数据持久层的角色，负责储存数据。而 Kibana 担任视图层角色，拥有各种维度的查询和分析，并使用图形化的界面展示存放在 Elasticsearch 中的数据。</p>
+<p>docker-compose.yml 文件</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br></pre></td><td class="code"><pre><span class="line">kibana:</span><br><span class="line">    image: kibana:$&#123;KIBANA_VERSION&#125; # 镜像</span><br><span class="line">    container_name: kibana # 容器名</span><br><span class="line">    environment: #参数</span><br><span class="line">      TZ: &quot;$TZ&quot;</span><br><span class="line">      elasticsearch.hosts: http://elasticsearch:9200 # 和 es 进行关联</span><br><span class="line">      I18N_LOCALE: &quot;$&#123;KIBANA_I18N_LOCALE&#125;&quot; #语言设置</span><br><span class="line">    hostname: kibana #主机名</span><br><span class="line">    depends_on: # Kibana 启动要取决于 es 是否启动</span><br><span class="line">      - elasticsearch</span><br><span class="line">    restart: always</span><br><span class="line">    ports:</span><br><span class="line">      - &quot;$&#123;KIBANA_HOST&#125;:5601&quot;</span><br><span class="line">    networks:</span><br><span class="line">      static-network:</span><br></pre></td></tr></table></figure>
+
+<p>.env 文件</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br></pre></td><td class="code"><pre><span class="line">#</span><br><span class="line"># KIBANA</span><br><span class="line">#</span><br><span class="line">KIBANA_VERSION=7.8.1</span><br><span class="line">KIBANA_HOST=5601</span><br><span class="line">KIBANA_I18N_LOCALE=zh-CN</span><br></pre></td></tr></table></figure>
+
+<h2 id="运行-ElasticSearch"><a href="#运行-ElasticSearch" class="headerlink" title="运行 ElasticSearch"></a>运行 ElasticSearch</h2><p>当集成完毕后，通过 <code>docker-compose up -d</code> 来进行启动和后台运行，通过 Docker 客户端可以看到</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202108/27/33853/3z6kPzRfT1.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<p>此时访问本地或服务器的 <code>9200</code> 端口可查看 es</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202108/27/33853/7RwYuisSn0.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<p>运行查看 Kibana，请求本地或服务器的 <code>5601</code> 端口，可查看</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202108/27/33853/C95Y4I5Fb3.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<h2 id="源码安装"><a href="#源码安装" class="headerlink" title="源码安装"></a>源码安装</h2><h3 id="配置JDK环境"><a href="#配置JDK环境" class="headerlink" title="配置JDK环境"></a>配置JDK环境</h3><p>配置环境变量</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">export JAVA_HOME=&quot;/opt/jdk1.8.0_144&quot;</span><br><span class="line">export PATH=&quot;$JAVA_HOME/bin:$PATH&quot;</span><br><span class="line">export CLASSPATH=&quot;.:$JAVA_HOME/lib&quot;</span><br></pre></td></tr></table></figure>
+
+<h3 id="安装ElasticSearch"><a href="#安装ElasticSearch" class="headerlink" title="安装ElasticSearch"></a>安装ElasticSearch</h3><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">下载地址：https://www.elastic.co/cn/downloads/elasticsearch</span><br></pre></td></tr></table></figure>
+
+<p>启动报错：<br><code>can not run elasticsearch as root</code></p>
+<p>解决方式：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">bin/elasticsearch -Des.insecure.allow.root=true</span><br><span class="line">或者修改</span><br><span class="line">bin/elasticsearch，加上ES_JAVA_OPTS属性：</span><br><span class="line">ES_JAVA_OPTS=&quot;-Des.insecure.allow.root=true&quot;</span><br></pre></td></tr></table></figure>
+
+<p>再次启动：<br><img src="https://note.youdao.com/yws/api/personal/file/F432E6405D5C4D5599A80F3F2F0FEB83?method=download&shareKey=242de0ee6034de7f0e46c6c120d88e68" alt="image"></p>
+<p>这是出于系统安全考虑设置的条件。由于ElasticSearch可以接收用户输入的脚本并且执行，为了系统安全考虑，建议创建一个单独的用户用来运行ElasticSearch。</p>
+<p>创建用户组和用户：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">groupadd esgroup</span><br><span class="line">useradd esuser -g esgroup -p espassword</span><br></pre></td></tr></table></figure>
+
+<p>更改elasticsearch文件夹及内部文件的所属用户及组：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">cd /opt</span><br><span class="line">chown -R esuser:esgroup elasticsearch-7.13.3</span><br></pre></td></tr></table></figure>
+
+<p>切换用户并运行：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">su esuser</span><br><span class="line">./bin/elasticsearch</span><br></pre></td></tr></table></figure>
+
+<p>再次启动显示已杀死：<br><img src="https://note.youdao.com/yws/api/personal/file/A03FC0640DD043EBBAFF66A34CB4B225?method=download&shareKey=073d77cddf7efa2810059f5b591b3548" alt="image"></p>
+<p>需要调整JVM的内存大小：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vi bin/elasticsearch</span><br><span class="line">ES_JAVA_OPTS=&quot;-Xms512m -Xmx512m&quot;</span><br></pre></td></tr></table></figure>
+
+<p>再次启动：启动成功</p>
+<p>如果显示如下类似信息：</p>
+<p><code>[INFO ][o.e.c.r.a.DiskThresholdMonitor] [ZAds5FP] low disk watermark [85%] exceeded on     [ZAds5FPeTY-ZUKjXd7HJKA][ZAds5FP][/opt/elasticsearch-7.13.3/data/nodes/0] free: 1.2gb[14.2%], replicas will not be assigned to this node</code></p>
+<p>需要清理磁盘空间。</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">后台运行：./bin/elasticsearch -d</span><br><span class="line">测试连接：curl 127.0.0.1:9200</span><br></pre></td></tr></table></figure>
+
+<p>会看到一下JSON数据：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br></pre></td><td class="code"><pre><span class="line"> [root@localhost ~]# curl 127.0.0.1:9200</span><br><span class="line">  &#123;</span><br><span class="line">  &quot;name&quot; : &quot;PC-202106281820&quot;,</span><br><span class="line">  &quot;cluster_name&quot; : &quot;elasticsearch&quot;,</span><br><span class="line">  &quot;cluster_uuid&quot; : &quot;S8au4PmBRzmkfdrle9jc3w&quot;,</span><br><span class="line">  &quot;version&quot; : &#123;</span><br><span class="line">    &quot;number&quot; : &quot;7.13.3&quot;,</span><br><span class="line">    &quot;build_flavor&quot; : &quot;default&quot;,</span><br><span class="line">    &quot;build_type&quot; : &quot;zip&quot;,</span><br><span class="line">    &quot;build_hash&quot; : &quot;5d21bea28db1e89ecc1f66311ebdec9dc3aa7d64&quot;,</span><br><span class="line">    &quot;build_date&quot; : &quot;2021-07-02T12:06:10.804015202Z&quot;,</span><br><span class="line">    &quot;build_snapshot&quot; : false,</span><br><span class="line">    &quot;lucene_version&quot; : &quot;8.8.2&quot;,</span><br><span class="line">    &quot;minimum_wire_compatibility_version&quot; : &quot;6.8.0&quot;,</span><br><span class="line">    &quot;minimum_index_compatibility_version&quot; : &quot;6.0.0-beta1&quot;</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;tagline&quot; : &quot;You Know, for Search&quot;</span><br><span class="line">&#125;</span><br><span class="line"></span><br></pre></td></tr></table></figure>
+
+<p>实现远程访问： 需要对<code>config/elasticsearch.yml</code>进行 配置：<code>network.host: IP</code><br>再次启动报错：<br><img src="https://note.youdao.com/yws/api/personal/file/EA3ED55EB0ED40C683112AC6ED8716AE?method=download&shareKey=7517e79986e6585de886c59966057d9c" alt="image"></p>
+<p>处理第一个错误：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">vim /etc/security/limits.conf       //文件最后加入</span><br><span class="line">esuser soft nofile 65536</span><br><span class="line">esuser hard nofile 65536</span><br><span class="line">esuser soft nproc 4096</span><br><span class="line">esuser hard nproc 4096</span><br></pre></td></tr></table></figure>
+
+<p>处理第二个错误：</p>
+<p>进入<code>limits.d</code>目录下修改配置文件。<br><code>vim /etc/security/limits.d/20-nproc.conf </code><br>修改为 <code>esuser soft nproc 4096</code></p>
+<p>处理第三个错误：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">vim /etc/sysctl.conf</span><br><span class="line">vm.max_map_count=655360</span><br></pre></td></tr></table></figure>
+
+<p>执行以下命令生效：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br></pre></td><td class="code"><pre><span class="line">sysctl -p</span><br><span class="line"></span><br><span class="line">关闭防火墙：systemctl stop firewalld.service</span><br></pre></td></tr></table></figure>
+
+<p>再次启动成功！</p>
+<h3 id="安装Kibana"><a href="#安装Kibana" class="headerlink" title="安装Kibana"></a>安装Kibana</h3><p>Kibana是一个针对Elasticsearch的开源分析及可视化平台，使用Kibana可以查询、查看并与存储在ES索引的数据进行交互操作，使用Kibana能执行高级的数据分析，并能以图表、表格和地图的形式查看数据</p>
+<h4 id="下载Kibana"><a href="#下载Kibana" class="headerlink" title="下载Kibana"></a>下载Kibana</h4><figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">https://www.elastic.co/downloads/kibana</span><br></pre></td></tr></table></figure>
+
+<p>(2)把下载好的压缩包拷贝到/soft目录下</p>
+<p>(3)解压缩，并把解压后的目录移动到/user/local/kibana</p>
+<p>(4)编辑kibana配置文件</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost /]# vi /usr/local/kibana/config/kibana.yml</span><br></pre></td></tr></table></figure>
+
+<p><img src="https://images2017.cnblogs.com/blog/210978/201708/210978-20170805113725272-708617928.png" alt="image"></p>
+<p>将server.host,elasticsearch.url修改成所在服务器的ip地址</p>
+<p>(5)开启5601端口</p>
+<p>Kibana的默认端口是5601</p>
+<p>开启防火墙:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">systemctl start firewalld.service</span><br></pre></td></tr></table></figure>
+
+<p>开启5601端口:</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">firewall-cmd --permanent --zone=public --add-port=5601/tcp</span><br></pre></td></tr></table></figure>
+
+<p>重启防火墙：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">firewall-cmd –reload</span><br></pre></td></tr></table></figure>
+
+<p>(6)启动Kibana</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">[root@localhost /]# /usr/local/kibana/bin/kibana</span><br></pre></td></tr></table></figure>
+
+<p>浏览器访问：</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">http://本地:5601  </span><br></pre></td></tr></table></figure>
+
+<h3 id="安装中文分词器"><a href="#安装中文分词器" class="headerlink" title="安装中文分词器"></a>安装中文分词器</h3><p>下载中文分词器</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">https://github.com/medcl/elasticsearch-analysis-ik</span><br><span class="line">下载elasticsearch-analysis-ik-master.zip</span><br></pre></td></tr></table></figure>
+
+<p>解压elasticsearch-analysis-ik-master.zip</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">unzip elasticsearch-analysis-ik-master.zip</span><br></pre></td></tr></table></figure>
+
+<p>进入elasticsearch-analysis-ik-master，编译源码</p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">mvn clean install -Dmaven.test.skip=true </span><br></pre></td></tr></table></figure>
+
+<p>在es的plugins文件夹下创建目录ik</p>
+<p>将编译后生成的elasticsearch-analysis-ik-版本.zip移动到ik下，并解压</p>
+<p>解压后的内容移动到ik目录下</p>
+<h2 id="ElasticSearch-使用"><a href="#ElasticSearch-使用" class="headerlink" title="ElasticSearch 使用"></a>ElasticSearch 使用</h2><p>es 是基于 RESTful web 接口，所以根据不同的请求，可进行不同的操作，本文使用 Kibana 工具进行对 es 的访问和使用</p>
+<p><img src="https://cdn.learnku.com/uploads/images/202108/27/33853/E99yqMqOS2.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<p><img src="https://cdn.learnku.com/uploads/images/202108/27/33853/uVtjxLHuw5.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<h3 id="索引简单基础使用"><a href="#索引简单基础使用" class="headerlink" title="索引简单基础使用"></a>索引简单基础使用</h3><p>要是用 es 存储数据，需要先创建一个 <code>索引</code> (相当于 MySql 的数据库)</p>
+<ol>
+<li><p>通过 <code>PUT</code> 请求创建一个简单的索引<br> <img src="https://cdn.learnku.com/uploads/images/202108/27/33853/ItoMdBfhqK.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+</li>
+<li><p>通过 <code>GET</code> 获取刚创建的索引<br> <img src="https://cdn.learnku.com/uploads/images/202108/27/33853/zkt1Uf3HaQ.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;user&quot;</span> : &#123; <span class="comment">//索引名</span></span><br><span class="line">    <span class="attr">&quot;aliases&quot;</span> : &#123; &#125;, <span class="comment">//别名</span></span><br><span class="line">    <span class="attr">&quot;mappings&quot;</span> : &#123; &#125;, <span class="comment">//映射</span></span><br><span class="line">    <span class="attr">&quot;settings&quot;</span> : &#123; <span class="comment">//设置</span></span><br><span class="line">      <span class="attr">&quot;index&quot;</span> : &#123;</span><br><span class="line">        <span class="attr">&quot;creation_date&quot;</span> : <span class="string">&quot;1630057022470&quot;</span>, <span class="comment">//创建时间</span></span><br><span class="line">        <span class="attr">&quot;number_of_shards&quot;</span> : <span class="string">&quot;1&quot;</span>, <span class="comment">//分片数量</span></span><br><span class="line">        <span class="attr">&quot;number_of_replicas&quot;</span> : <span class="string">&quot;1&quot;</span>, <span class="comment">//备份数量</span></span><br><span class="line">        <span class="attr">&quot;uuid&quot;</span> : <span class="string">&quot;cfbmaM-2SM2vr-EvciKUug&quot;</span>, <span class="comment">//唯一标识</span></span><br><span class="line">        <span class="attr">&quot;version&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;created&quot;</span> : <span class="string">&quot;7080199&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;provided_name&quot;</span> : <span class="string">&quot;user&quot;</span></span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li><p>通过 <code>DELETE</code> 方法删除索引<br> <img src="https://cdn.learnku.com/uploads/images/202108/27/33853/PN9Sr99sOQ.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+</li>
+</ol>
+<h3 id="文档简单基础使用"><a href="#文档简单基础使用" class="headerlink" title="文档简单基础使用"></a>文档简单基础使用</h3><p>索引创建好之后，就可以通过接口来创建文档，并添加数据。这里的文档可以类比为关系型数<br>据库中的表数据，添加的数据格式为 <code>JSON</code> 格式</p>
+<ol>
+<li><p>通过 <code>POST</code> 方法来创建文档，需加上默认的 type 类型 <code>_doc</code><br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/lv0wpm2ccw.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+ <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  &quot;_index&quot; : &quot;students&quot;, //索引名</span><br><span class="line">  &quot;_type&quot; : &quot;_doc&quot;, //默认 type 类型</span><br><span class="line">  &quot;_id&quot; : &quot;-vBqm3sBvfOuEZni9DUz&quot;, //生成的唯一id,类比 mysql 的 id</span><br><span class="line">  &quot;_version&quot; : 1, //版本</span><br><span class="line">  &quot;result&quot; : &quot;created&quot;, //操作结果</span><br><span class="line">  &quot;_shards&quot; : &#123; //分片</span><br><span class="line">	&quot;total&quot; : 2, //分片总数</span><br><span class="line">	&quot;successful&quot; : 1,</span><br><span class="line">	&quot;failed&quot; : 0</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;_seq_no&quot; : 0,</span><br><span class="line">  &quot;_primary_term&quot; : 1</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p> 上面创建数据后，由于没有指定数据唯一性标识（ID），默认情况下，ES 服务器会随机生成，</p>
+</li>
+<li><p>创建指定 <code>id</code> 的数据，如果有 id，使用 <code>PUT</code> 方法也可以<br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/VEdxNnoFPn.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+</li>
+<li><p>通过 <code>GET</code> 方法，查看文档,需要带入 id 进行查询<br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/da1aXBLtnJ.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+</li>
+<li><p>通过 <code>POST</code> 方法，修改某一个字段的值<br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/bO2YBWOw1r.png!large" alt="Docker ElasticSearch7.8.1 安装使用"><br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/GDmDlIzoGq.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></p>
+</li>
+<li><p>通过 <code>DELETE</code> 方法删除文档数据<br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/0cdW7ibnnt.png!large" alt="Docker ElasticSearch7.8.1 安装使用"><br> <img src="https://cdn.learnku.com/uploads/images/202108/31/33853/9KdwKtEiMh.png!large" alt="Docker ElasticSearch7.8.1 安装使用"><br> 删除一个文档不会立即从磁盘上移除，它只是被标记成已删除（逻辑删除）。当然没有 id，也可以根据查询条件进行删除，后续会说明</p>
+</li>
+</ol>
+<h2 id="索引映射"><a href="#索引映射" class="headerlink" title="索引映射"></a>索引映射</h2><p>映射是定义文档及其包含的字段如何存储和索引的过程，相当于 MySql 的表字段类型设置。每个文档都是一个字段的集合，每个字段都有自己的 <code>数据类型</code>。</p>
+<p>映射和索引是一对一的关系。映射分为 <code>静态映射</code> 和 <code>动态映射</code>。</p>
+<h3 id="动态映射"><a href="#动态映射" class="headerlink" title="动态映射"></a>动态映射</h3><p>静态映射：添加文档时，如果检测到新字段，Elasticsearch会新建该文档字段的特性生成一个动态映射，也就是 Es 自动推断并设置新字段的数据类型等。</p>
+<p>字段映射类型和JSON文档字段类型的关系如下：</p>
+<table>
+<thead>
+<tr>
+<th>JSON数据类型</th>
+<th>ES 推断的数据类型</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>null</td>
+<td>未添加字段</td>
+</tr>
+<tr>
+<td>true 或者 false</td>
+<td>boolean</td>
+</tr>
+<tr>
+<td>double</td>
+<td>float</td>
+</tr>
+<tr>
+<td>integer</td>
+<td>long</td>
+</tr>
+<tr>
+<td>object</td>
+<td>object</td>
+</tr>
+<tr>
+<td>array</td>
+<td>取决于数组中的第一个非null值</td>
+</tr>
+<tr>
+<td>string</td>
+<td>根据字符串内容特征而定，有可能为text/keyword/double/long/date类型等</td>
+</tr>
+</tbody></table>
+<p>使用 Kibana 向 ES 创建如下文档</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br></pre></td><td class="code"><pre><span class="line">PUT /person/_doc/<span class="number">1</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;id&quot;</span>: <span class="number">1</span>,</span><br><span class="line">  <span class="attr">&quot;name&quot;</span>: <span class="string">&quot;张三&quot;</span>,</span><br><span class="line">  <span class="attr">&quot;height&quot;</span>: <span class="number">180.52</span>,</span><br><span class="line">  <span class="attr">&quot;man&quot;</span>: <span class="literal">true</span>,</span><br><span class="line">  <span class="attr">&quot;country&quot;</span>: <span class="string">&quot;中国&quot;</span>,</span><br><span class="line">  <span class="attr">&quot;born&quot;</span>: <span class="string">&quot;1950-6-14&quot;</span>,</span><br><span class="line">  <span class="attr">&quot;child&quot;</span>: [<span class="string">&quot;李四&quot;</span>, <span class="string">&quot;王五&quot;</span>, <span class="string">&quot;赵六&quot;</span>]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>ES 会自动创建 person 索引，并动态映射字段类型</p>
+<p><code>GET /person/_mapping</code> 查询索引的映射信息</p>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;person&quot;</span> : &#123;</span><br><span class="line">    <span class="attr">&quot;mappings&quot;</span> : &#123;</span><br><span class="line">      <span class="attr">&quot;properties&quot;</span> : &#123;</span><br><span class="line">        <span class="attr">&quot;born&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;child&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;country&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;height&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;float&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;id&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;long&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;man&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;boolean&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;name&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+<p>可以看到 ES 依据创建的 JSON 数据推断并创建了数据的类型</p>
+<h3 id="静态映射"><a href="#静态映射" class="headerlink" title="静态映射"></a>静态映射</h3><p>既然 ES 能自动推断字段类型，那么也就可以在创建索引的时候，手动进行字段的类型定义，类似于MySQL 的建表操作。</p>
+<ol>
+<li>通过 <code>PUT /students/_mapping</code> 向 students 索引建立静态映射<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">PUT /students/_mapping</span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;properties&quot;</span>:&#123;</span><br><span class="line">    <span class="attr">&quot;title&quot;</span>:&#123;</span><br><span class="line">      <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;index&quot;</span>: <span class="literal">true</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;image&quot;</span>:&#123;</span><br><span class="line">      <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;index&quot;</span>: <span class="literal">false</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;content&quot;</span>:&#123;</span><br><span class="line">      <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;text&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;index&quot;</span>:<span class="literal">true</span>,</span><br><span class="line">      <span class="attr">&quot;analyzer&quot;</span>:<span class="string">&quot;ik_max_word&quot;</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;sell&quot;</span>:&#123;</span><br><span class="line">      <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;long&quot;</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+ <img src="https://cdn.learnku.com/uploads/images/202109/01/33853/lKpgJnCWYt.png!large" alt="Docker ElasticSearch7.8.1 安装使用"></li>
+<li>通过 <code>GET /students/_mapping</code> 查看创建的映射信息<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;students&quot;</span> : &#123;</span><br><span class="line">    <span class="attr">&quot;mappings&quot;</span> : &#123;</span><br><span class="line">      <span class="attr">&quot;properties&quot;</span> : &#123;</span><br><span class="line">        <span class="attr">&quot;age&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;long&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;content&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;analyzer&quot;</span> : <span class="string">&quot;ik_max_word&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;desc&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;image&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;index&quot;</span> : <span class="literal">false</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;name&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;sell&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;long&quot;</span></span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;sex&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;text&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;fields&quot;</span> : &#123;</span><br><span class="line">            <span class="attr">&quot;keyword&quot;</span> : &#123;</span><br><span class="line">              <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">              <span class="attr">&quot;ignore_above&quot;</span> : <span class="number">256</span></span><br><span class="line">            &#125;</span><br><span class="line">          &#125;</span><br><span class="line">        &#125;,</span><br><span class="line">        <span class="attr">&quot;title&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;keyword&quot;</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<p>关于索引的静态映射，基础的数据有</p>
+<ol>
+<li>字段名：任意填写,字段名字</li>
+<li>type：类型，就是字段类型，Es 支持的字段类型有很多，常用的有<ol>
+<li>string<ol>
+<li>text 可分词，字段的内容会被分词器进行分词，然后形成倒排索引</li>
+<li>keyword 不可分词，数据会作为完整字段进行匹配</li>
+</ol>
+</li>
+<li>Numerical<ol>
+<li>基本数据类型：long、integer、short、byte、double、float、half_float</li>
+<li>浮点数的高精度类型：scaled_float</li>
+</ol>
+</li>
+<li>Date 日期类型</li>
+<li>array 数组类型</li>
+<li>object 对象类型</li>
+</ol>
+</li>
+<li>index：是否索引，默认为 true，也就是说你不进行任何配置，所有字段都会被索引<br> true：字段会被索引，则可以用来进行搜索<br> false：字段不会被索引，不能用来搜索</li>
+<li>analyzer：分词器，对这个字段使用那种分词器，这里的 ik_max_word 即使用 ik 分词器</li>
+</ol>
+<h3 id="string-的-text-和-keyword"><a href="#string-的-text-和-keyword" class="headerlink" title="string 的 text 和 keyword"></a>string 的 text 和 keyword</h3><p><strong>text</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1:支持分词，全文检索,支持模糊、精确查询,不支持聚合,排序操作; 2:test类型的最大支持的字符长度无限制,适合大字段存储； 使用场景： 存储全文搜索数据, 例如: 邮箱内容、地址、代码块、博客文章内容等。 默认结合standard analyzer(标准解析器)对文本进行分词、倒排索引。 默认结合标准分析器进行词命中、词频相关度打分。</span><br></pre></td></tr></table></figure>
+<p><strong>keyword</strong></p>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">1:不进行分词，直接索引,支持模糊、支持精确匹配，支持聚合、排序操作。 2:keyword类型的最大支持的长度为——32766个UTF-8类型的字符,可以通过设置ignore_above指定自持字符长度，超过给定长度后的数据将不被索引，无法通过term精确匹配检索返回结果。 使用场景： 存储邮箱号码、url、name、title，手机号码、主机名、状态码、邮政编码、标签、年龄、性别等数据。 用于筛选数据(例如: select * from x where  status=&#x27;open&#x27;)、排序、聚合(统计)。 直接将完整的文本保存到倒排索引中。</span><br></pre></td></tr></table></figure>
+<p>text 类型的数据会把内容 <code>先进行分词</code>，然后再 <code>再存入</code> 到es中。<br>keyword：不分词，没有数据内容进行分词处理，而是存入了整个数据！</p>
+<h4 id="案列说明"><a href="#案列说明" class="headerlink" title="案列说明"></a>案列说明</h4><ol>
+<li>创建 test 索引 <code>PUT /test</code></li>
+<li>创建静态映射，映射两个字段 <code>title:keyword</code>,<code>content:text</code> <figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line">PUT /test/_mapping</span><br><span class="line">&#123;</span><br><span class="line"> <span class="attr">&quot;properties&quot;</span>:&#123;</span><br><span class="line">   <span class="attr">&quot;title&quot;</span>:&#123;</span><br><span class="line">     <span class="attr">&quot;type&quot;</span>: <span class="string">&quot;keyword&quot;</span>,</span><br><span class="line">     <span class="attr">&quot;index&quot;</span>: <span class="literal">true</span></span><br><span class="line">   &#125;,</span><br><span class="line">   <span class="attr">&quot;content&quot;</span>:&#123;</span><br><span class="line">     <span class="attr">&quot;type&quot;</span>:<span class="string">&quot;text&quot;</span>,</span><br><span class="line">     <span class="attr">&quot;index&quot;</span>:<span class="literal">true</span>,</span><br><span class="line">     <span class="attr">&quot;analyzer&quot;</span>:<span class="string">&quot;ik_max_word&quot;</span></span><br><span class="line">   &#125;</span><br><span class="line">   &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>创建文档，存入数据<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br></pre></td><td class="code"><pre><span class="line">PUT /test/_doc/<span class="number">1</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;title&quot;</span>:<span class="string">&quot;分布式，高扩展，高实时&quot;</span>,</span><br><span class="line">  <span class="attr">&quot;content&quot;</span>:<span class="string">&quot;Elasticsearch 是一个分布式,高扩展,高实时的搜索与数据分析引擎&quot;</span></span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+<li>通过全部内容进行匹配查询，查询 content <figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br></pre></td><td class="code"><pre><span class="line">	GET /test/_doc/_search</span><br><span class="line">	&#123;</span><br><span class="line">    &quot;query&quot;:&#123;</span><br><span class="line">    &quot;term&quot;:&#123;</span><br><span class="line">      &quot;content&quot;:&quot;Elasticsearch 是一个分布式,高扩展,高实时的搜索与数据分析引擎&quot;</span><br><span class="line">    &#125;</span><br><span class="line">    &#125;</span><br><span class="line">	&#125;</span><br><span class="line"># 查询结果</span><br><span class="line">```json</span><br><span class="line">&#123;</span><br><span class="line">  &quot;took&quot; : 0,</span><br><span class="line">  &quot;timed_out&quot; : false,</span><br><span class="line">  &quot;_shards&quot; : &#123;</span><br><span class="line">    &quot;total&quot; : 1,</span><br><span class="line">    &quot;successful&quot; : 1,</span><br><span class="line">    &quot;skipped&quot; : 0,</span><br><span class="line">    &quot;failed&quot; : 0</span><br><span class="line">  &#125;,</span><br><span class="line">  &quot;hits&quot; : &#123;</span><br><span class="line">    &quot;total&quot; : &#123;</span><br><span class="line">      &quot;value&quot; : 0,</span><br><span class="line">      &quot;relation&quot; : &quot;eq&quot;</span><br><span class="line">    &#125;,</span><br><span class="line">    &quot;max_score&quot; : null,</span><br><span class="line">    &quot;hits&quot; : [ ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure></li>
+</ol>
+<figure class="highlight plaintext"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line">可以看到查询数据为空</span><br><span class="line">使用 title 查询</span><br></pre></td></tr></table></figure>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">GET /test/_doc/_search</span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;query&quot;</span>:&#123;</span><br><span class="line">    <span class="attr">&quot;term&quot;</span>:&#123;</span><br><span class="line">      <span class="attr">&quot;title&quot;</span>:<span class="string">&quot;分布式，高扩展，高实时&quot;</span></span><br><span class="line">    &#125;</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+<h1 id="查询结果"><a href="#查询结果" class="headerlink" title="查询结果"></a>查询结果</h1><figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br></pre></td><td class="code"><pre><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;took&quot;</span> : <span class="number">0</span>,</span><br><span class="line">  <span class="attr">&quot;timed_out&quot;</span> : <span class="literal">false</span>,</span><br><span class="line">  <span class="attr">&quot;_shards&quot;</span> : &#123;</span><br><span class="line">    <span class="attr">&quot;total&quot;</span> : <span class="number">1</span>,</span><br><span class="line">    <span class="attr">&quot;successful&quot;</span> : <span class="number">1</span>,</span><br><span class="line">    <span class="attr">&quot;skipped&quot;</span> : <span class="number">0</span>,</span><br><span class="line">    <span class="attr">&quot;failed&quot;</span> : <span class="number">0</span></span><br><span class="line">  &#125;,</span><br><span class="line">  <span class="attr">&quot;hits&quot;</span> : &#123;</span><br><span class="line">    <span class="attr">&quot;total&quot;</span> : &#123;</span><br><span class="line">      <span class="attr">&quot;value&quot;</span> : <span class="number">1</span>,</span><br><span class="line">      <span class="attr">&quot;relation&quot;</span> : <span class="string">&quot;eq&quot;</span></span><br><span class="line">    &#125;,</span><br><span class="line">    <span class="attr">&quot;max_score&quot;</span> : <span class="number">0.2876821</span>,</span><br><span class="line">    <span class="attr">&quot;hits&quot;</span> : [</span><br><span class="line">      &#123;</span><br><span class="line">        <span class="attr">&quot;_index&quot;</span> : <span class="string">&quot;test&quot;</span>,</span><br><span class="line">        <span class="attr">&quot;_type&quot;</span> : <span class="string">&quot;_doc&quot;</span>,</span><br><span class="line">        <span class="attr">&quot;_id&quot;</span> : <span class="string">&quot;1&quot;</span>,</span><br><span class="line">        <span class="attr">&quot;_score&quot;</span> : <span class="number">0.2876821</span>,</span><br><span class="line">        <span class="attr">&quot;_source&quot;</span> : &#123;</span><br><span class="line">          <span class="attr">&quot;title&quot;</span> : <span class="string">&quot;分布式，高扩展，高实时&quot;</span>,</span><br><span class="line">          <span class="attr">&quot;content&quot;</span> : <span class="string">&quot;Elasticsearch 是一个分布式,高扩展,高实时的搜索与数据分析引擎&quot;</span></span><br><span class="line">        &#125;</span><br><span class="line">      &#125;</span><br><span class="line">    ]</span><br><span class="line">  &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>可看到对 <code>content</code> 的 <code>text</code> 类型进行全部内容匹配查不到数据，而对 <code>title</code> 的 <code>keyword</code> 类型进行全部内容匹配成功查到数据.</p>
+</blockquote>
+<blockquote>
+<p>可通过 <code>GET /test/_analyze</code> 查看这条数据在存入 es 的时候分词情况:</p>
+</blockquote>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br></pre></td><td class="code"><pre><span class="line">GET /test/_analyze</span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;field&quot;</span>: <span class="string">&quot;title&quot;</span>,</span><br><span class="line">  <span class="attr">&quot;text&quot;</span>:<span class="string">&quot;分布式，高扩展，高实时&quot;</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//分词结果</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;tokens&quot;</span> : [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;分布式，高扩展，高实时&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">0</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">11</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;word&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">0</span></span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>存储数据的时候不会对 title 的内容进行分词，而是全部内容存入 es.</p>
+</blockquote>
+<blockquote>
+<p>查看 content 存入情况:</p>
+</blockquote>
+<figure class="highlight json"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br><span class="line">78</span><br><span class="line">79</span><br><span class="line">80</span><br><span class="line">81</span><br><span class="line">82</span><br><span class="line">83</span><br><span class="line">84</span><br><span class="line">85</span><br><span class="line">86</span><br><span class="line">87</span><br><span class="line">88</span><br><span class="line">89</span><br><span class="line">90</span><br><span class="line">91</span><br><span class="line">92</span><br><span class="line">93</span><br><span class="line">94</span><br><span class="line">95</span><br><span class="line">96</span><br><span class="line">97</span><br><span class="line">98</span><br><span class="line">99</span><br><span class="line">100</span><br><span class="line">101</span><br><span class="line">102</span><br><span class="line">103</span><br><span class="line">104</span><br><span class="line">105</span><br><span class="line">106</span><br><span class="line">107</span><br><span class="line">108</span><br><span class="line">109</span><br><span class="line">110</span><br><span class="line">111</span><br><span class="line">112</span><br><span class="line">113</span><br><span class="line">114</span><br><span class="line">115</span><br><span class="line">116</span><br><span class="line">117</span><br><span class="line">118</span><br><span class="line">119</span><br><span class="line">120</span><br><span class="line">121</span><br><span class="line">122</span><br><span class="line">123</span><br><span class="line">124</span><br><span class="line">125</span><br><span class="line">126</span><br><span class="line">127</span><br><span class="line">128</span><br><span class="line">129</span><br><span class="line">130</span><br><span class="line">131</span><br><span class="line">132</span><br><span class="line">133</span><br><span class="line">134</span><br><span class="line">135</span><br><span class="line">136</span><br><span class="line">137</span><br><span class="line">138</span><br><span class="line">139</span><br><span class="line">140</span><br><span class="line">141</span><br><span class="line">142</span><br><span class="line">143</span><br></pre></td><td class="code"><pre><span class="line">GET /test/_analyze</span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;field&quot;</span>: <span class="string">&quot;content&quot;</span>,</span><br><span class="line">  <span class="attr">&quot;text&quot;</span>:<span class="string">&quot;Elasticsearch 是一个分布式,高扩展,高实时的搜索与数据分析引擎&quot;</span></span><br><span class="line">&#125;</span><br><span class="line"><span class="comment">//分词结果</span></span><br><span class="line">&#123;</span><br><span class="line">  <span class="attr">&quot;tokens&quot;</span> : [</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;elasticsearch&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">0</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">13</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;ENGLISH&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">0</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;是&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">14</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">15</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">1</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;一个&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">15</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">17</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">2</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;一&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">15</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">16</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;TYPE_CNUM&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">3</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;个&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">16</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">17</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;COUNT&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">4</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;分布式&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">17</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">20</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">5</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;分布&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">17</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">19</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">6</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;式&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">19</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">20</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">7</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;高&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">21</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">22</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">8</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;扩展&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">22</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">24</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">9</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;高&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">25</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">26</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">10</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;实时&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">26</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">28</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">11</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;的&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">28</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">29</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">12</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;搜索&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">29</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">31</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">13</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;与&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">31</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">32</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_CHAR&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">14</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;数据&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">32</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">34</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">15</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;据分析&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">33</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">36</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">16</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;分析&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">34</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">36</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">17</span></span><br><span class="line">    &#125;,</span><br><span class="line">    &#123;</span><br><span class="line">      <span class="attr">&quot;token&quot;</span> : <span class="string">&quot;引擎&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;start_offset&quot;</span> : <span class="number">36</span>,</span><br><span class="line">      <span class="attr">&quot;end_offset&quot;</span> : <span class="number">38</span>,</span><br><span class="line">      <span class="attr">&quot;type&quot;</span> : <span class="string">&quot;CN_WORD&quot;</span>,</span><br><span class="line">      <span class="attr">&quot;position&quot;</span> : <span class="number">18</span></span><br><span class="line">    &#125;</span><br><span class="line">  ]</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<blockquote>
+<p>对 <code>content</code> 的内容会先进行分词，在存储，所以使用全内容进行匹配时，在 es 中是找不到的 ,  <code>ElasticSearch</code> 的使用是最最最基本的。</p>
+</blockquote>
+
+        <p class="suffix-end">__END__</p>
+        <div class="suffix-box">
+            <div class="suffix-box-left">
+                <img src="https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg" alt="Lustm">
+            </div>
+            <div class="suffix-box-right">
+                <span class="suffix-box-title">文章作者</span>：Lustm
+                <br>
+                <span class="suffix-box-title">文章出处</span>：<a href="/2021/11/06/Elasticsearch%E7%9A%84%E5%AE%89%E8%A3%85%E5%92%8C%E7%AE%80%E5%8D%95%E4%BD%BF%E7%94%A8/" target="_blank">Elasticsearch的安装和简单使用</a>
+                <br>
+                <span class="suffix-box-title">作者签名</span>：简单地活着, 肆意又精彩.
+                <br>
+                <span class="suffix-box-title">关于主题</span>：<a href="https://github.com/first19326/Hexo-LiveForCode" target="_blank">Hexo - Live For Code</a>
+                <br>
+                <span class="suffix-box-title">版权声明</span>：文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" title="BY-NC-SA" target="_blank">BY-NC-SA</a> 许可协议，转载请注明出处
+                <br>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+    </div>
+    <div class="article-footer">
+        
+            <div class="category">
+                分类：
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/">搜索引擎</a>
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/elasticsearch/">elasticsearch</a>
+                
+            </div>
+        
+        
+            <div class="tag">
+                标签：
+                
+                    <a href="/tags/elasticsearch/">elasticsearch</a>
+                
+            </div>
+        
+        <div class="article-prev-next">
+            
+                <a href="/2021/12/01/ElasticSearch%20429%20Too%20Many%20Requests%20circuit_breaking_exception/" class="prev-prefix">« </a> 上一篇：    <a href="/2021/12/01/ElasticSearch%20429%20Too%20Many%20Requests%20circuit_breaking_exception/" title="发布于 2021-12-01 04:01">ElasticSearch 429 Too Many Requests circuit_breaking_exception</a>
+                <br>
+            
+            
+                <a href="/2021/11/06/Elasticsearch%E5%8E%9F%E7%90%86%E4%BB%A5%E5%8F%8A%E5%88%86%E5%B8%83%E5%BC%8F%E6%9E%B6%E6%9E%84/" class="next-prefix">» </a> 下一篇：    <a href="/2021/11/06/Elasticsearch%E5%8E%9F%E7%90%86%E4%BB%A5%E5%8F%8A%E5%88%86%E5%B8%83%E5%BC%8F%E6%9E%B6%E6%9E%84/" title="发布于 2021-11-06 03:12">Elasticsearch原理以及分布式架构</a>
+            
+        </div>
+    </div>
+    
+    <div class="article-comments">
+        <div class="comments-title">
+            评论列表
+        </div>
+        <div class="comments-content">
+        </div>
+    </div>
+
+</div>
+
+    </div>
+</div>
+    <div id="footer"></div>
+    <div id="sidebar">
+    <div class="menu-wrap" style="display:none;">
+        <nav class="menu">
+            <div class="menu-introduce"> 
+                <div class="introduce-avatar"></div> 
+                <div class="introduce-info"> 
+                    <div class="introduce-user"><span></span></div>        
+                </div> 
+            </div> 
+            <div class="menu-list">
+                <ul></ul> 
+            </div> 
+            <div class="menu-link"></div> 
+        </nav>
+        <button class="menu-button-close"></button>
+        <div class="morph-shape" id="morph-shape" data-morph-open="M-7.312,0H15c0,0,66,113.339,66,399.5C81,664.006,15,800,15,800H-7.312V0z;M-7.312,0H100c0,0,0,113.839,0,400c0,264.506,0,400,0,400H-7.312V0z">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 800" preserveAspectRatio="none">
+                <path d="M-7.312,0H0c0,0,0,113.839,0,400c0,264.506,0,400,0,400h-7.312V0z"/>
+            </svg>
+        </div>
+    </div>
+    <button class="menu-button-open">MENU</button>
+    <div class="menu-cover"></div>
+</div>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js"></script>
+<div class="search-window">
+    <div class="search-content">
+        <div class="search-content-icon">
+            <i class="iconfont icon-search"></i>
+        </div>
+        <div id="search-input" class="search-input"></div>
+    </div>
+
+    <div class="search-scroll">
+        <div class="search-result">
+            <div id="search-stats" class="search-stats"></div>
+            <div id="search-hits"></div>
+            <div id="search-pagination" class="search-pagination"></div>
+        </div>
+    </div>
+
+    <span class="search-close-icon">
+        <i class="iconfont icon-close"></i>
+    </span>
+</div>
+    <div id="tools">
+    <div class="progressbar-top"></div>
+
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css">
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js"></script>
+        <meting-js id="3778678" lrcshow="false" server="netease" type="playlist" fixed="true" autoplay="false" loop="all" order="random" preload="auto" volume="0.67" mutex="true"></meting-js>
+    
+    
+    <div class="wrap-right"></div>
+    <div class="loading"></div>
+</div>
+    <script>
+    window.config = {
+        GitHubUserName     : 'lustm',
+        GitHubRepositories : 'hexo-source',
+
+        BlogUser      : 'Lustm',
+        BlogAvatar    : 'https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg',
+        BlogStartDate : '2021-12-23',
+
+        WebsiteTitleBlur         : '(◍´꒳`◍) Hi, come back quickly',
+        WebsiteTitleBlurTimeOut  : 500,
+        WebsiteTitleFocus        : '(*´∇｀*) Welcome back!',
+        WebsiteTitleFocusTimeOut : 1000,
+        WebsiteFavicon           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/logo.png',
+
+        ProgressBar: {
+            id       : 'topProgressBar',
+            color    : '#77B6FF',
+            height   : '2px',
+            duration : 0.2
+        },
+
+        Loading: {
+            rebound: {
+                tension  : 16,
+                friction : 5
+            },
+            spinner: {
+                id     : 'spinner',
+                radius : 90,
+                sides  : 3,
+                depth  : 4,
+                colors : {
+                    background : '#F0F0F0',
+                    stroke     : '#272633',
+                    base       : '',
+                    child      : '#272633'
+                },
+                alwaysForward : true,
+                restAt        : 0.5,
+                renderBase    : false
+            }
+        },
+
+        HomeHeaderAnimationRendered : true,
+        HomeHeaderAnimation         : {
+            radius      : 15,
+            density     : 0.2,
+            color       : 'rgba(255, 255, 255, .2)',
+            clearOffset : 0.3
+        },
+
+        ArticleHeaderAnimationRendered : false,
+        ArticleHeaderAnimation         : {
+            triW                  : 14,
+            triH                  : 20,
+            neighbours            : [
+                
+                    'side',
+                
+                    'top',
+                
+                    'bottom',
+                
+            ],
+            speedTrailAppear      : 0.1,
+            speedTrailDisappear   : 0.1,
+            speedTriOpen          : 1,
+            trailMaxLength        : 30,
+            trailIntervalCreation : 100,
+            delayBeforeDisappear  : 2,
+            colors                : [
+                
+                    '#96EDA6',
+                
+                    '#5BC6A9',
+                
+                    '#38668C',
+                
+                    '#374D84',
+                
+                    '#BED5CB',
+                
+                    '#62ADC6',
+                
+                    '#8EE5DE',
+                
+                    '#304E7B',
+                
+            ]
+        },
+
+        BackAnimationRendered          : true,
+        IEBrowserBackAnimationRendered : false,
+        BackAnimation                  : {
+            colorSaturation  : '60%',
+            colorBrightness  : '50%',
+            colorAlpha       : 0.5,
+            colorCycleSpeed  : 5,
+            verticalPosition : 'random',
+            horizontalSpeed  : 200,
+            ribbonCount      : 3,
+            strokeSize       : 0,
+            parallaxAmount   : -0.2,
+            animateSections  : true
+        },
+
+        HomeHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpg',
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpeg',
+            
+        ],
+        HomeBannerText  : '',
+
+        ArticleHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/article.jpg',
+            
+        ],
+
+        OtherBannerText : '',
+
+        MenuList : [
+            
+                {
+                    name   : '首页',
+                    href   : '/',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '标签',
+                    href   : '/tag',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '分类',
+                    href   : '/category',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '归档',
+                    href   : '/archive',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '赞赏',
+                    href   : '/donate',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '关于',
+                    href   : '/about',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '订阅',
+                    href   : '/atom.xml',    
+                    target : '_blank',
+                    class  : ''
+                },
+            
+                {
+                    name   : '搜索',
+                    href   : '',    
+                    target : '',
+                    class  : 'search'
+                },
+            
+                {
+                    name   : '留言板',
+                    href   : '/comment',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '友情链接',
+                    href   : '/friend',    
+                    target : '',
+                    class  : ''
+                },
+            
+        ],
+        MenuLink : [
+            
+                
+                    {
+                        icon : 'icon-weibo', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-wechat', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-qq', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-github', 
+                        url  : 'https://github.com/lustm'
+                    },
+                
+            
+        ],
+
+        FooterStyle : 2,
+        BottomText  : {
+            icon    : 'like-fill',
+            left    : '人生若只如初见',
+            right   : '何事秋风悲画扇'
+        },
+        ThemeInfo   : true,
+
+        ConsoleList : [
+            
+                
+                    [
+                        
+                            
+                                'Based on cnblogs theme SimpleMemory.',
+                            
+                                '',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'SimpleMemory Author:',
+                            
+                                'BNDong',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'Theme:',
+                            
+                                'LiveForCode',
+                            
+                        
+                    ],
+                
+            
+        ],
+
+        FontIconExtend : '',
+
+        Donate : {
+            paypal  : '',
+            bitcoin : '',
+            alipay  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/alipay.png',
+            wechat  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/wechat.png'
+        },
+
+        Code : {
+            style : 'normal'
+        },  
+
+        Search : {
+            applicationID : 'BX367M4TD2',
+            apiKey        : '522ed64d7cc9964a9fe64ad7f15b66bf',
+            indexName     : 'hexo',
+            hits          : {
+                page : 10
+            },
+            labels        : {
+                placeholder : '搜索',
+                empty       : '未发现与 「${query}」 相关的内容',
+                stats       : '${hits} 条相关条目，使用了 ${time} 毫秒',
+            }
+        }, 
+
+        Valine : {
+            switch         : true,
+            el             : '.comments-content',
+            appId          : 'vU2CPQHyaPOyOheG1dc6zkOt-MdYXbMMI',
+            appKey         : 'xAx3L0LGorEGIyPEjqhcc4nb',
+            placeholder    : '你是我一生只会遇见一次的惊喜...',
+            avatar         : 'mm',
+            meta           : 'nick,mail,link',
+            requiredFields : 'nick,mail',
+            pageSize       : 5,
+            lang           : 'zh-cn',
+            visitor        : true,
+            enableQQ       : true
+        },
+
+        Tocbot : {
+            switch                : true,
+            tocSelector           : '.toc',
+            contentSelector       : '.article-body',
+            headingSelector       : 'h1, h2, h3, h4, h5',
+            headingsOffset        : 0,
+            scrollSmooth          : true,
+            scrollSmoothOffset    : -5,
+            positionFixedSelector : '.toc',
+            positionFixedClass    : 'toc-fixed',
+            fixedSidebarOffset    : '',
+        },
+
+        Require : {
+            baseUrl     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/',
+            waitSeconds : 100
+        },
+
+        Music : {
+            type : 'Meting'
+        },
+        APlayer : {
+            container : '.aplayer',
+            fixed     : true,
+            autoplay  : false,
+            loop      : 'all',
+            order     : 'random',
+            preload   : 'auto',
+            volume    : 0.67,
+            mutex     : true,
+            lrcType   : 3,
+            audio     : [
+                
+                    {
+                        name   : 'aLIEz',
+                        artist : 'mizuki（瑞葵）',
+                        cover  : '/music/cover/aLIEz.jpg',
+                        url    : '/music/song/aLIEz.mp3',
+                        lrc    : '/music/lrc/aLIEz.lrc'
+                    },
+                
+                    {
+                        name   : 'Endless Tears',
+                        artist : 'CLIFF EDGE',
+                        cover  : '/music/cover/Endless Tears.jpg',
+                        url    : '/music/song/Endless Tears.mp3',
+                        lrc    : '/music/lrc/Endless Tears.lrc'
+                    },
+                
+                    {
+                        name   : 'Miracle',
+                        artist : 'Cascada',
+                        cover  : '/music/cover/Miracle.jpg',
+                        url    : '/music/song/Miracle.mp3',
+                        lrc    : '/music/lrc/Miracle.lrc'
+                    },
+                
+                    {
+                        name   : 'Roll The Dice',
+                        artist : '高珊',
+                        cover  : '/music/cover/Roll The Dice.jpg',
+                        url    : '/music/song/Roll The Dice.mp3',
+                        lrc    : '/music/lrc/Roll The Dice.lrc'
+                    },
+                
+                    {
+                        name   : 'See You Again',
+                        artist : 'Charlie Puth, Wiz Khalifa',
+                        cover  : '/music/cover/See You Again.jpg',
+                        url    : '/music/song/See You Again.mp3',
+                        lrc    : '/music/lrc/See You Again.lrc'
+                    },
+                
+                    {
+                        name   : 'Traveling Light',
+                        artist : 'Joel Hanson, Sara Groves',
+                        cover  : '/music/cover/Traveling Light.jpg',
+                        url    : '/music/song/Traveling Light.mp3',
+                        lrc    : '/music/lrc/Traveling Light.lrc'
+                    },
+                
+                    {
+                        name   : '痴心绝对',
+                        artist : '李圣杰',
+                        cover  : '/music/cover/痴心绝对.jpg',
+                        url    : '/music/song/痴心绝对.mp3',
+                        lrc    : '/music/lrc/痴心绝对.lrc'
+                    },
+                
+                    {
+                        name   : '好想大声说爱你',
+                        artist : 'BAAD（バード）',
+                        cover  : '/music/cover/好想大声说爱你.jpg',
+                        url    : '/music/song/好想大声说爱你.mp3',
+                        lrc    : '/music/lrc/好想大声说爱你.lrc'
+                    },
+                
+            ]
+        },
+        Meting : {
+            id       : '3778678', 
+            lrcshow  : false, 
+            server   : 'netease', 
+            type     : 'playlist', 
+            fixed    : true, 
+            autoplay : false, 
+            loop     : 'all', 
+            order    : 'random', 
+            preload  : 'auto', 
+            volume   : 0.67, 
+            mutex    : true
+        },
+
+        Mouse : {
+            enable  : true,
+            options : {
+                size  : 6,
+                sizeF : 24
+            }
+        },
+
+        LazyLoad : {
+            default : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/lazyload.svg'
+        },
+  
+        Style : {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css',
+            archive          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/archive.css',
+            donate           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/donate.css',
+            fancybox         : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/jquery.fancybox.css',
+            footer           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/footer.css',
+            iconfont         : 'https://at.alicdn.com/t/font_1546312_l3yohatebw.css',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/index.css',
+            menuBubble       : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/menu-bubble.css',
+            page             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/page.css',
+            post             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css',
+            search           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css',
+            tocbot           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/tocbot.css',
+            normal           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css',
+            night            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/night.css',
+            clipboard        : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/clipboard.css'
+        },
+
+        Script: {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js',
+            config           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.config.js',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js',
+            instantSearch    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js',
+            jQuery           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js',
+            loading          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/loading.js',
+            meting           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js',
+            iscroll          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js',
+            require          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.min.js'
+        },
+
+        Font: {
+            LongCang   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css',
+            Monda      : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css',
+            NotoSansSC : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css',
+            Playball   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css',
+            PTMono     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css',
+            RobotoSlab : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css',
+            Rosario    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css',
+            UbuntuMono : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css'
+        },
+
+        Suffix : {
+            about : '简单地活着, 肆意又精彩.'
+        },
+            
+        Theme : {
+            url  : 'https://github.com/first19326/Hexo-LiveForCode',
+            name : 'Hexo - Live For Code'
+        }  
+    };
+</script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js"></script>
+</body>
+</html>

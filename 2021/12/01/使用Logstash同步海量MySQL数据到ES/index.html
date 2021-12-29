@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, shrink-to-fit=no">
+    <meta name="referrer" content="origin">
+    <meta http-equiv="Cache-Control" content="no-transform">
+    <meta http-equiv="Cache-Control" content="no-siteapp">
+    <title>使用Logstash同步海量MySQL数据到ES</title>
+    <link rel="shortcut icon" href="#"/>
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css">
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css">
+
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css">
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css">
+    
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js"></script>
+
+<meta name="generator" content="Hexo 5.4.0"><link rel="alternate" href="/atom.xml" title="Hexo" type="application/atom+xml">
+</head>
+<body>
+    <a id="cover"></a>
+    <div id="header">
+    <div class="header">
+        <div class="vertical">
+            <div class="inner">
+                <h1 class="header-subtitle">使用Logstash同步海量MySQL数据到ES</h1>
+                <div class="header-subinfo">
+                    <p class="article-info-text">
+                        <span>
+                            <i class="iconfont icon-time"></i> 发表时间：2021-12-01
+                        </span>
+                        
+                            <span id="/2021/12/01/使用Logstash同步海量MySQL数据到ES/" class="leancloud_visitors" data-flag-title="使用Logstash同步海量MySQL数据到ES">
+                                <i class="iconfont icon-browse"></i> 阅读：<sapn class="leancloud-visitors-count"></span>
+                            </span>
+                        
+                        <span>
+                            <i class="iconfont icon-interactive"></i> 评论：<span class="valine-comment-count" data-xid="/2021/12/01/使用Logstash同步海量MySQL数据到ES/"></span>
+                        </span>  
+                    </p>                 
+                </div>
+            </div>
+        </div>
+        <canvas id="articleHeaderCanvas"></canvas>
+    </div>
+</div>
+    <div id="container">
+    <div id="content">
+        <div id="article">
+    <div class="toc"></div>
+    <div class="article-body">
+        <p><strong>概述</strong></p>
+<p>  在生产业务常有将 <a target="_blank" rel="noopener" href="https://cloud.tencent.com/product/cdb?from=10680">MySQL</a> 数据同步到 ES 的需求，如果需要很高的定制化，往往需要开发同步程序用于处理数据。但没有特殊业务需求，官方提供的Logstash 就很有优势了。  在使用 Logstash 我们应先了解其特性，再决定是否使用：</p>
+<ul>
+<li>无需开发，仅需安装配置 Logstash 即可；</li>
+<li>凡是 SQL 可以实现的 Logstash 均可以实现（本就是通过 sql 查询数据）</li>
+<li>支持每次全量同步或按照特定字段（如递增ID、修改时间）增量同步；</li>
+<li>同步频率可控，最快同步频率每分钟一次（如果对实效性要求较高，慎用）；</li>
+<li>不支持被物理删除的数据同步物理删除ES中的数据（可在表设计中增加逻辑删除字段 IsDelete 标识数据删除）。</li>
+</ul>
+<h1 id="1、安装"><a href="#1、安装" class="headerlink" title="1、安装"></a><strong>1、安装</strong></h1><p>  前往官网下载 Logstash，下载地址<a target="_blank" rel="noopener" href="https://www.elastic.co/downloads/logstash%EF%BC%8Czip%E5%8E%8B%E7%BC%A9%E5%8C%85%E5%A4%A7%E7%BA%A6160M%EF%BC%88%E5%A6%82%E6%9E%9C%E4%B8%8B%E8%BD%BD%E9%80%9F%E5%BA%A6%E5%A4%AA%E6%85%A2%E5%8F%AF%E4%BB%A5%E9%80%89%E7%94%A8%E8%BF%99%E4%B8%AA%E4%BB%A3%E7%90%86%E5%9C%B0%E5%9D%80%E4%B8%8B%E8%BD%BD%EF%BC%9Ahttp://mirror.azk8s.cn/elastic/logstash/%EF%BC%89%EF%BC%9B">https://www.elastic.co/downloads/logstash，zip压缩包大约160M（如果下载速度太慢可以选用这个代理地址下载：http://mirror.azk8s.cn/elastic/logstash/）；</a></p>
+<p>  程序目录：</p>
+<ul>
+<li>【windows】G:\ELK\logstash-6.5.4；               </li>
+<li>【linux】/tomcat/logstash/logstash-6.5.4。 下文统一以【程序目录】表示不同环境的安装目录。</li>
+</ul>
+<span id="more"></span>
+
+<h1 id="2、配置"><a href="#2、配置" class="headerlink" title="2、配置"></a><strong>2、配置</strong></h1><h2 id="2-1、新建目录存放配置文件及mysql依赖包"><a href="#2-1、新建目录存放配置文件及mysql依赖包" class="headerlink" title="2.1、新建目录存放配置文件及mysql依赖包"></a><strong>2.1、新建目录存放配置文件及mysql依赖包</strong></h2><p>  在【程序目录】目录（\bin同级）新建mysql目录，将下载好的mysql-connector-java-5.1.34.jar放入此目录；  在【程序目录】\mysql目录新建jdbc.conf文件，此文件将配置<a target="_blank" rel="noopener" href="https://cloud.tencent.com/solution/database?from=10680">数据库</a>连接信息、查询数据sql、分页信息、同步频率等核心信息。  注意事项请查看注释信息。</p>
+<h2 id="2-2、单表同步配置"><a href="#2-2、单表同步配置" class="headerlink" title="2.2、单表同步配置"></a><strong>2.2、单表同步配置</strong></h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br><span class="line">65</span><br><span class="line">66</span><br><span class="line">67</span><br><span class="line">68</span><br><span class="line">69</span><br><span class="line">70</span><br><span class="line">71</span><br><span class="line">72</span><br><span class="line">73</span><br><span class="line">74</span><br><span class="line">75</span><br><span class="line">76</span><br><span class="line">77</span><br></pre></td><td class="code"><pre><span class="line">input &#123;</span><br><span class="line">	stdin &#123;&#125;</span><br><span class="line">	jdbc &#123;</span><br><span class="line">		<span class="function"><span class="params">type</span> =&gt;</span> <span class="string">&quot;jdbc&quot;</span></span><br><span class="line">		 # 数据库连接地址</span><br><span class="line">		jdbc_connection_string =&gt; <span class="string">&quot;jdbc:mysql://192.168.1.1:3306/TestDB?characterEncoding=UTF-8&amp;autoReconnect=true&quot;</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 数据库连接账号密码；</span></span><br><span class="line"><span class="string">		jdbc_user =&gt; &quot;</span>username<span class="string">&quot;</span></span><br><span class="line"><span class="string">		jdbc_password =&gt; &quot;</span>pwd<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # MySQL依赖包路径；</span></span><br><span class="line"><span class="string">		jdbc_driver_library =&gt; &quot;</span>mysql/mysql-connector-java-<span class="number">5.1</span><span class="number">.34</span>.jar<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # the name of the driver class for mysql</span></span><br><span class="line"><span class="string">		jdbc_driver_class =&gt; &quot;</span>com.mysql.jdbc.Driver<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 数据库重连尝试次数</span></span><br><span class="line"><span class="string">		connection_retry_attempts =&gt; &quot;</span><span class="number">3</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 判断数据库连接是否可用，默认false不开启</span></span><br><span class="line"><span class="string">		jdbc_validate_connection =&gt; &quot;</span><span class="literal">true</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 数据库连接可用校验超时时间，默认3600S</span></span><br><span class="line"><span class="string">		jdbc_validation_timeout =&gt; &quot;</span><span class="number">3600</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 开启分页查询（默认false不开启）；</span></span><br><span class="line"><span class="string">		jdbc_paging_enabled =&gt; &quot;</span><span class="literal">true</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 单次分页查询条数（默认100000,若字段较多且更新频率较高，建议调低此值）；</span></span><br><span class="line"><span class="string">		jdbc_page_size =&gt; &quot;</span><span class="number">500</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # statement为查询数据sql，如果sql较复杂，建议配通过statement_filepath配置sql文件的存放路径；</span></span><br><span class="line"><span class="string">		 # sql_last_value为内置的变量，存放上次查询结果中最后一条数据tracking_column的值，此处即为ModifyTime；</span></span><br><span class="line"><span class="string">		 # statement_filepath =&gt; &quot;</span>mysql/jdbc.sql<span class="string">&quot;</span></span><br><span class="line"><span class="string">		statement =&gt; &quot;</span>SELECT KeyId,TradeTime,OrderUserName,ModifyTime FROM <span class="string">`DetailTab`</span> WHERE ModifyTime&gt;= :sql_last_value order by ModifyTime asc<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 是否将字段名转换为小写，默认true（如果有数据序列化、反序列化需求，建议改为false）；</span></span><br><span class="line"><span class="string">		lowercase_column_names =&gt; false</span></span><br><span class="line"><span class="string">		 # Value can be any of: fatal,error,warn,info,debug，默认info；</span></span><br><span class="line"><span class="string">		sql_log_level =&gt; warn</span></span><br><span class="line"><span class="string">		 #</span></span><br><span class="line"><span class="string">		 # 是否记录上次执行结果，true表示会将上次执行结果的tracking_column字段的值保存到last_run_metadata_path指定的文件中；</span></span><br><span class="line"><span class="string">		record_last_run =&gt; true</span></span><br><span class="line"><span class="string">		 # 需要记录查询结果某字段的值时，此字段为true，否则默认tracking_column为timestamp的值；</span></span><br><span class="line"><span class="string">		use_column_value =&gt; true</span></span><br><span class="line"><span class="string">		 # 需要记录的字段，用于增量同步，需是数据库字段</span></span><br><span class="line"><span class="string">		tracking_column =&gt; &quot;</span>ModifyTime<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # Value can be any of: numeric,timestamp，Default value is &quot;</span>numeric<span class="string">&quot;</span></span><br><span class="line"><span class="string">		tracking_column_type =&gt; timestamp</span></span><br><span class="line"><span class="string">		 # record_last_run上次数据存放位置；</span></span><br><span class="line"><span class="string">		last_run_metadata_path =&gt; &quot;</span>mysql/last_id.txt<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 是否清除last_run_metadata_path的记录，需要增量同步时此字段必须为false；</span></span><br><span class="line"><span class="string">		clean_run =&gt; false</span></span><br><span class="line"><span class="string">		 #</span></span><br><span class="line"><span class="string">		 # 同步频率(分 时 天 月 年)，默认每分钟同步一次；</span></span><br><span class="line"><span class="string">		schedule =&gt; &quot;</span>* * * * *<span class="string">&quot;</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">&#125;</span></span><br><span class="line"><span class="string"></span></span><br><span class="line"><span class="string">filter &#123;</span></span><br><span class="line"><span class="string">	json &#123;</span></span><br><span class="line"><span class="string">		source =&gt; &quot;</span>message<span class="string">&quot;</span></span><br><span class="line"><span class="string">		remove_field =&gt; [&quot;</span>message<span class="string">&quot;]</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">	# convert 字段类型转换，将字段TotalMoney数据类型改为float；</span></span><br><span class="line"><span class="string">	mutate &#123;</span></span><br><span class="line"><span class="string">		convert =&gt; &#123;</span></span><br><span class="line"><span class="string">			&quot;</span>TotalMoney<span class="string">&quot; =&gt; &quot;</span>float<span class="string">&quot;</span></span><br><span class="line"><span class="string">		&#125;</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">&#125;</span></span><br><span class="line"><span class="string">output &#123;</span></span><br><span class="line"><span class="string">	elasticsearch &#123;</span></span><br><span class="line"><span class="string">		 # host =&gt; &quot;</span><span class="number">192.168</span><span class="number">.1</span><span class="number">.1</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # port =&gt; &quot;</span><span class="number">9200</span><span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 配置ES集群地址</span></span><br><span class="line"><span class="string">		hosts =&gt; [&quot;</span><span class="number">192.168</span><span class="number">.1</span><span class="number">.1</span>:<span class="number">9200</span><span class="string">&quot;, &quot;</span><span class="number">192.168</span><span class="number">.1</span><span class="number">.2</span>:<span class="number">9200</span><span class="string">&quot;, &quot;</span><span class="number">192.168</span><span class="number">.1</span><span class="number">.3</span>:<span class="number">9200</span><span class="string">&quot;]</span></span><br><span class="line"><span class="string">		 # 索引名字，必须小写</span></span><br><span class="line"><span class="string">		index =&gt; &quot;</span>consumption<span class="string">&quot;</span></span><br><span class="line"><span class="string">		 # 数据唯一索引（建议使用数据库KeyID）</span></span><br><span class="line"><span class="string">		document_id =&gt; &quot;</span>%&#123;KeyId&#125;<span class="string">&quot;</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">	stdout &#123;</span></span><br><span class="line"><span class="string">		codec =&gt; json_lines</span></span><br><span class="line"><span class="string">	&#125;</span></span><br><span class="line"><span class="string">&#125;</span></span><br></pre></td></tr></table></figure>
+
+<h2 id="2-3、多表同步"><a href="#2-3、多表同步" class="headerlink" title="2.3、多表同步"></a><strong>2.3、多表同步</strong></h2><p>  多表配置和单表配置的区别在于input模块的jdbc模块有几个type，output模块就需对应有几个type；</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br><span class="line">38</span><br><span class="line">39</span><br><span class="line">40</span><br><span class="line">41</span><br><span class="line">42</span><br><span class="line">43</span><br><span class="line">44</span><br><span class="line">45</span><br><span class="line">46</span><br><span class="line">47</span><br><span class="line">48</span><br><span class="line">49</span><br><span class="line">50</span><br><span class="line">51</span><br><span class="line">52</span><br><span class="line">53</span><br><span class="line">54</span><br><span class="line">55</span><br><span class="line">56</span><br><span class="line">57</span><br><span class="line">58</span><br><span class="line">59</span><br><span class="line">60</span><br><span class="line">61</span><br><span class="line">62</span><br><span class="line">63</span><br><span class="line">64</span><br></pre></td><td class="code"><pre><span class="line">input &#123;</span><br><span class="line">	stdin &#123;&#125;</span><br><span class="line">	jdbc &#123;</span><br><span class="line">		 # 多表同步时，表类型区分，建议命名为“库名_表名”，每个jdbc模块需对应一个type；</span><br><span class="line">		type =&gt; <span class="string">&quot;TestDB_DetailTab&quot;</span></span><br><span class="line">		</span><br><span class="line">		 # 其他配置此处省略，参考单表配置</span><br><span class="line">		 # ...</span><br><span class="line">		 # ...</span><br><span class="line">		 # record_last_run上次数据存放位置；</span><br><span class="line">		last_run_metadata_path =&gt; <span class="string">&quot;mysql\last_id.txt&quot;</span></span><br><span class="line">		 # 是否清除last_run_metadata_path的记录，需要增量同步时此字段必须为<span class="literal">false</span>；</span><br><span class="line">		clean_run =&gt; <span class="literal">false</span></span><br><span class="line">		 #</span><br><span class="line">		 # 同步频率(分 时 天 月 年)，默认每分钟同步一次；</span><br><span class="line">		schedule =&gt; <span class="string">&quot;* * * * *&quot;</span></span><br><span class="line">	&#125;</span><br><span class="line">	jdbc &#123;</span><br><span class="line">		 # 多表同步时，表类型区分，建议命名为“库名_表名”，每个jdbc模块需对应一个type；</span><br><span class="line">		type =&gt; <span class="string">&quot;TestDB_Tab2&quot;</span></span><br><span class="line">		# 多表同步时，last_run_metadata_path配置的路径应不一致，避免有影响；</span><br><span class="line">		 # 其他配置此处省略</span><br><span class="line">		 # ...</span><br><span class="line">		 # ...</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">filter &#123;</span><br><span class="line">	json &#123;</span><br><span class="line">		<span class="function"><span class="params">source</span> =&gt;</span> <span class="string">&quot;message&quot;</span></span><br><span class="line">		remove_field =&gt; [<span class="string">&quot;message&quot;</span>]</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line">output &#123;</span><br><span class="line">	# output模块的type需和jdbc模块的type一致</span><br><span class="line">	<span class="keyword">if</span> [type] == <span class="string">&quot;TestDB_DetailTab&quot;</span> &#123;</span><br><span class="line">		elasticsearch &#123;</span><br><span class="line">			 # host =&gt; <span class="string">&quot;192.168.1.1&quot;</span></span><br><span class="line">			 # port =&gt; <span class="string">&quot;9200&quot;</span></span><br><span class="line">			 # 配置ES集群地址</span><br><span class="line">			hosts =&gt; [<span class="string">&quot;192.168.1.1:9200&quot;</span>, <span class="string">&quot;192.168.1.2:9200&quot;</span>, <span class="string">&quot;192.168.1.3:9200&quot;</span>]</span><br><span class="line">			 # 索引名字，必须小写</span><br><span class="line">			index =&gt; <span class="string">&quot;detailtab1&quot;</span></span><br><span class="line">			 # 数据唯一索引（建议使用数据库KeyID）</span><br><span class="line">			document_id =&gt; <span class="string">&quot;%&#123;KeyId&#125;&quot;</span></span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	<span class="keyword">if</span> [type] == <span class="string">&quot;TestDB_Tab2&quot;</span> &#123;</span><br><span class="line">		elasticsearch &#123;</span><br><span class="line">			# host =&gt; <span class="string">&quot;192.168.1.1&quot;</span></span><br><span class="line">			# port =&gt; <span class="string">&quot;9200&quot;</span></span><br><span class="line">			# 配置ES集群地址</span><br><span class="line">			hosts =&gt; [<span class="string">&quot;192.168.1.1:9200&quot;</span>, <span class="string">&quot;192.168.1.2:9200&quot;</span>, <span class="string">&quot;192.168.1.3:9200&quot;</span>]</span><br><span class="line">			# 索引名字，必须小写</span><br><span class="line">			index =&gt; <span class="string">&quot;detailtab2&quot;</span></span><br><span class="line">			# 数据唯一索引（建议使用数据库KeyID）</span><br><span class="line">			document_id =&gt; <span class="string">&quot;%&#123;KeyId&#125;&quot;</span></span><br><span class="line">		&#125;</span><br><span class="line">	&#125;</span><br><span class="line">	stdout &#123;</span><br><span class="line">		<span class="function"><span class="params">codec</span> =&gt;</span> json_lines</span><br><span class="line">	&#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h1 id="3、启动运行"><a href="#3、启动运行" class="headerlink" title="3、启动运行"></a><strong>3、启动运行</strong></h1><p>  在【程序目录】目录执行以下命令启动：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">【windows】</span><br><span class="line">bin\logstash.bat -f mysql\jdbc.conf</span><br><span class="line">【linux】</span><br><span class="line">nohup ./bin/logstash -f mysql/jdbc_jx_moretable.conf &amp;</span><br></pre></td></tr></table></figure>
+
+<p>  可新建脚本配置好启动命令，后期直接运行即可。  在【程序目录】\logs目录会有<strong>运行日志</strong>。</p>
+<p><strong>Note：</strong>  5.x/6.X/7.x版本需要jdk8支持，如果默认jdk版本不是jdk8，那么需要在logstash或logstash.lib.sh的行首位置添加两个环境变量：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">export</span> JAVA_CMD=<span class="string">&quot;/usr/tools/jdk1.8.0_162/bin&quot;</span></span><br><span class="line"><span class="keyword">export</span> JAVA_HOME=<span class="string">&quot;/usr/tools/jdk1.8.0_162/&quot;</span></span><br></pre></td></tr></table></figure>
+
+<p><strong>开机自启动：</strong></p>
+<ul>
+<li>windows开机自启：<ul>
+<li>方案1：使用windows自带的任务计划；</li>
+<li>方案2：nssm注册windows服务，<a target="_blank" rel="noopener" href="https://blog.csdn.net/u010887744/article/details/53957713">https://blog.csdn.net/u010887744/article/details/53957713</a></li>
+</ul>
+</li>
+</ul>
+<h1 id="4、问题及解决方案"><a href="#4、问题及解决方案" class="headerlink" title="4、问题及解决方案"></a><strong>4、问题及解决方案</strong></h1><h2 id="4-1、数据同步后，ES没有数据"><a href="#4-1、数据同步后，ES没有数据" class="headerlink" title="4.1、数据同步后，ES没有数据"></a><strong>4.1、数据同步后，ES没有数据</strong></h2><p>  output.elasticsearch模块的index必须是全小写；</p>
+<h2 id="4-2、增量同步后last-run-metadata-path文件内容不改变"><a href="#4-2、增量同步后last-run-metadata-path文件内容不改变" class="headerlink" title="4.2、增量同步后last_run_metadata_path文件内容不改变"></a><strong>4.2、增量同步后last_run_metadata_path文件内容不改变</strong></h2><p>  如果lowercase_column_names配置的不是false，那么tracking_column字段配置的必须是全小写。</p>
+<h2 id="4-3、提示找不到jdbc-driver-library"><a href="#4-3、提示找不到jdbc-driver-library" class="headerlink" title="4.3、提示找不到jdbc_driver_library"></a><strong>4.3、提示找不到jdbc_driver_library</strong></h2><figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br></pre></td><td class="code"><pre><span class="line"><span class="number">2032</span> com.mysql.jdbc.Driver not loaded.</span><br><span class="line">Are you sure you<span class="string">&#x27;ve included the correct jdbc driver in :jdbc_driver_library?</span></span><br></pre></td></tr></table></figure>
+
+<p>  检测配置的地址是否正确，如果是linux环境，注意路径分隔符是“/”，而不是“\”。</p>
+<h2 id="4-4、数据丢失"><a href="#4-4、数据丢失" class="headerlink" title="4.4、数据丢失"></a><strong>4.4、数据丢失</strong></h2><p>  statement配置的sql中，如果比较字段使用的是大于“&gt;”，可能存在数据丢失。  假设当同步完成后last_run_metadata_path存放的时间为2019-01-30 20:45:30，而这时候新入库一条数据的更新时间也为2019-01-30 20:45:30，那么这条数据将无法同步。  解决方案：将比较字段使用 大于等于“&gt;=”。</p>
+<h2 id="4-5、数据重复更新"><a href="#4-5、数据重复更新" class="headerlink" title="4.5、数据重复更新"></a><strong>4.5、数据重复更新</strong></h2><p>  上一个问题“数据丢失”提供的解决方案是比较字段使用“大于等于”，但这时又会产生新的问题。  假设当同步完成后last_run_metadata_path存放的时间为2019-01-30 20:45:30，而数据库中更新时间最大值也为2019-01-30 20:45:30，那么这些数据将重复更新，直到有更新时间更大的数据出现。  当上述特殊数据很多，且长期没有新的数据更新时，会导致大量的数据重复同步到ES。  何时会出现以上情况呢：①比较字段非“自增”；②比较字段是程序生成插入。 <strong>解决方案：</strong></p>
+<ul>
+<li>①比较字段自增保证不重复或重复概率极小（比如使用自增ID或者数据库的timestamp），这样就能避免大部分异常情况了；</li>
+<li>②如果确实存在大量程序插入的数据，其更新时间相同，且可能长期无数据更新，可考虑定期更新数据库中的一条测试数据，避免最大值有大量数据。</li>
+</ul>
+<h2 id="4-6、容灾"><a href="#4-6、容灾" class="headerlink" title="4.6、容灾"></a><strong>4.6、容灾</strong></h2><p>  logstash本身无法集群，我们常使用的组合ELK是通过kafka集群变相实现集群的。  可供选择的处理方式：①使用任务程序推送数据到kafaka，由kafka同步数据到ES，但任务程序本身也需要容灾，并需要考虑重复推送的问题；②将logstash加入守护程序，并辅以第三方监控其运行状态。  具体如何选择，需要结合自身的应用场景了。</p>
+<h2 id="4-7、海量数据同步"><a href="#4-7、海量数据同步" class="headerlink" title="4.7、海量数据同步"></a><strong>4.7、海量数据同步</strong></h2><p>  为什么会慢？logstash分页查询使用临时表分页，每条分页SQL都是将全集查询出来当作临时表，再在临时表上分页查询。这样导致每次分页查询都要对主表进行一次全表扫描。</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br></pre></td><td class="code"><pre><span class="line">SELECT * FROM (SELECT * FROM <span class="string">`ImageCN1`</span></span><br><span class="line"> WHERE ModifyTime&gt;= <span class="string">&#x27;1970-01-01 08:00:00&#x27;</span></span><br><span class="line"> order by ModifyTime asc) AS <span class="string">`t1`</span></span><br><span class="line"> LIMIT <span class="number">5000</span> OFFSET <span class="number">10000000</span>;</span><br></pre></td></tr></table></figure>
+
+<p>  数据量太大，首次同步如何安全过渡同步？  可考虑在statement对应的sql中加上分页条件，比如ID在什么范围，修改时间在什么区间，将单词同步的数据总量减少。先少量数据同步测试验证，再根据测试情况修改区间条件启动logstash完成同步。比如将SQL修改为：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br></pre></td><td class="code"><pre><span class="line">SELECT</span><br><span class="line">	*</span><br><span class="line">FROM</span><br><span class="line">	<span class="string">`ImageCN1`</span> </span><br><span class="line">WHERE</span><br><span class="line">	ModifyTime &lt; <span class="string">&#x27;2018-10-10 10:10:10&#x27;</span> AND ModifyTime &gt;= <span class="string">&#x27;1970-01-01 08:00:00&#x27;</span> </span><br><span class="line">ORDER BY</span><br><span class="line">	ModifyTime ASC</span><br></pre></td></tr></table></figure>
+
+<p>  当同步完ModifyTime&lt;’2018-10-10 10:10:10’区间的数据在修改SQL同步剩余区间的数据。  这样需要每次同步后就修改sql，线上运营比较繁琐，是否可以不修改sql，同时保证同步效率呢？SQL我们可以再修改下：</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line">SELECT</span><br><span class="line">	*</span><br><span class="line">FROM</span><br><span class="line">	<span class="string">`ImageCN1`</span> </span><br><span class="line">WHERE</span><br><span class="line">	ModifyTime &gt;= <span class="string">&#x27;1970-01-01 08:00:00&#x27;</span> </span><br><span class="line">ORDER BY</span><br><span class="line">	ModifyTime ASC </span><br><span class="line">	LIMIT <span class="number">100000</span></span><br></pre></td></tr></table></figure>
+
+<p>  这样就能保证每次子查询的数据量不超过10W条，实际测试发现，数据量很大时效果很明显。</p>
+<figure class="highlight javascript"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br></pre></td><td class="code"><pre><span class="line">[SQL]USE XXXDataDB;</span><br><span class="line">受影响的行: <span class="number">0</span></span><br><span class="line">时间: <span class="number">0.</span>001s</span><br><span class="line"></span><br><span class="line">[SQL]</span><br><span class="line">SELECT</span><br><span class="line">	*</span><br><span class="line">FROM</span><br><span class="line">	( SELECT * FROM <span class="string">`ImageCN1`</span> WHERE ModifyTime &gt;= <span class="string">&#x27;1970-01-01 08:00:00&#x27;</span> ORDER BY ModifyTime ASC ) AS <span class="string">`t1`</span> </span><br><span class="line">	LIMIT <span class="number">5000</span> OFFSET <span class="number">900000</span>;</span><br><span class="line">受影响的行: <span class="number">0</span></span><br><span class="line">时间: <span class="number">7.</span>229s</span><br><span class="line"></span><br><span class="line">[SQL]</span><br><span class="line">SELECT</span><br><span class="line">	*</span><br><span class="line">FROM</span><br><span class="line">	( SELECT * FROM <span class="string">`ImageCN1`</span> WHERE ModifyTime &gt;= <span class="string">&#x27;2018-07-18 19:35:10&#x27;</span> ORDER BY ModifyTime ASC LIMIT <span class="number">100000</span> ) AS <span class="string">`t1`</span> </span><br><span class="line">	LIMIT <span class="number">5000</span> OFFSET <span class="number">90000</span></span><br><span class="line">受影响的行: <span class="number">0</span></span><br><span class="line">时间: <span class="number">1.</span>778s</span><br></pre></td></tr></table></figure>
+
+<p>  测试可以看出，SQL不加limit 10W时，越往后分页查询越慢，耗时达到8S，而<strong>加了limit条件的SQL耗时稳定在2S以内</strong>。</p>
+
+        <p class="suffix-end">__END__</p>
+        <div class="suffix-box">
+            <div class="suffix-box-left">
+                <img src="https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg" alt="Lustm">
+            </div>
+            <div class="suffix-box-right">
+                <span class="suffix-box-title">文章作者</span>：Lustm
+                <br>
+                <span class="suffix-box-title">文章出处</span>：<a href="/2021/12/01/%E4%BD%BF%E7%94%A8Logstash%E5%90%8C%E6%AD%A5%E6%B5%B7%E9%87%8FMySQL%E6%95%B0%E6%8D%AE%E5%88%B0ES/" target="_blank">使用Logstash同步海量MySQL数据到ES</a>
+                <br>
+                <span class="suffix-box-title">作者签名</span>：简单地活着, 肆意又精彩.
+                <br>
+                <span class="suffix-box-title">关于主题</span>：<a href="https://github.com/first19326/Hexo-LiveForCode" target="_blank">Hexo - Live For Code</a>
+                <br>
+                <span class="suffix-box-title">版权声明</span>：文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/" title="BY-NC-SA" target="_blank">BY-NC-SA</a> 许可协议，转载请注明出处
+                <br>
+            </div>
+            <div style="clear: both;"></div>
+        </div>
+    </div>
+    <div class="article-footer">
+        
+            <div class="category">
+                分类：
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/">搜索引擎</a>
+                
+                    <a href="/categories/%E6%90%9C%E7%B4%A2%E5%BC%95%E6%93%8E/elasticsearch/">elasticsearch</a>
+                
+            </div>
+        
+        
+            <div class="tag">
+                标签：
+                
+                    <a href="/tags/elasticsearch/">elasticsearch</a>
+                
+            </div>
+        
+        <div class="article-prev-next">
+            
+                <a href="/2021/12/01/Elasticsearch%E5%A6%82%E4%BD%95%E8%AE%A9%E4%B8%80%E4%B8%AA%E5%AD%97%E6%AE%B5%E5%90%8C%E6%97%B6%E6%94%AF%E6%8C%81%E7%B2%BE%E7%A1%AE%E5%8C%B9%E9%85%8D%E5%92%8C%E6%A8%A1%E7%B3%8A%E6%A3%80%E7%B4%A2/" class="prev-prefix">« </a> 上一篇：    <a href="/2021/12/01/Elasticsearch%E5%A6%82%E4%BD%95%E8%AE%A9%E4%B8%80%E4%B8%AA%E5%AD%97%E6%AE%B5%E5%90%8C%E6%97%B6%E6%94%AF%E6%8C%81%E7%B2%BE%E7%A1%AE%E5%8C%B9%E9%85%8D%E5%92%8C%E6%A8%A1%E7%B3%8A%E6%A3%80%E7%B4%A2/" title="发布于 2021-12-01 05:06">Elasticsearch如何让一个字段同时支持精确匹配和模糊检索</a>
+                <br>
+            
+            
+                <a href="/2021/12/01/ElasticSearch%20429%20Too%20Many%20Requests%20circuit_breaking_exception/" class="next-prefix">» </a> 下一篇：    <a href="/2021/12/01/ElasticSearch%20429%20Too%20Many%20Requests%20circuit_breaking_exception/" title="发布于 2021-12-01 04:01">ElasticSearch 429 Too Many Requests circuit_breaking_exception</a>
+            
+        </div>
+    </div>
+    
+    <div class="article-comments">
+        <div class="comments-title">
+            评论列表
+        </div>
+        <div class="comments-content">
+        </div>
+    </div>
+
+</div>
+
+    </div>
+</div>
+    <div id="footer"></div>
+    <div id="sidebar">
+    <div class="menu-wrap" style="display:none;">
+        <nav class="menu">
+            <div class="menu-introduce"> 
+                <div class="introduce-avatar"></div> 
+                <div class="introduce-info"> 
+                    <div class="introduce-user"><span></span></div>        
+                </div> 
+            </div> 
+            <div class="menu-list">
+                <ul></ul> 
+            </div> 
+            <div class="menu-link"></div> 
+        </nav>
+        <button class="menu-button-close"></button>
+        <div class="morph-shape" id="morph-shape" data-morph-open="M-7.312,0H15c0,0,66,113.339,66,399.5C81,664.006,15,800,15,800H-7.312V0z;M-7.312,0H100c0,0,0,113.839,0,400c0,264.506,0,400,0,400H-7.312V0z">
+            <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 100 800" preserveAspectRatio="none">
+                <path d="M-7.312,0H0c0,0,0,113.839,0,400c0,264.506,0,400,0,400h-7.312V0z"/>
+            </svg>
+        </div>
+    </div>
+    <button class="menu-button-open">MENU</button>
+    <div class="menu-cover"></div>
+</div>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css">
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js"></script>
+<script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js"></script>
+<div class="search-window">
+    <div class="search-content">
+        <div class="search-content-icon">
+            <i class="iconfont icon-search"></i>
+        </div>
+        <div id="search-input" class="search-input"></div>
+    </div>
+
+    <div class="search-scroll">
+        <div class="search-result">
+            <div id="search-stats" class="search-stats"></div>
+            <div id="search-hits"></div>
+            <div id="search-pagination" class="search-pagination"></div>
+        </div>
+    </div>
+
+    <span class="search-close-icon">
+        <i class="iconfont icon-close"></i>
+    </span>
+</div>
+    <div id="tools">
+    <div class="progressbar-top"></div>
+
+    
+        <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css">
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js"></script>
+        <meting-js id="3778678" lrcshow="false" server="netease" type="playlist" fixed="true" autoplay="false" loop="all" order="random" preload="auto" volume="0.67" mutex="true"></meting-js>
+    
+    
+    <div class="wrap-right"></div>
+    <div class="loading"></div>
+</div>
+    <script>
+    window.config = {
+        GitHubUserName     : 'lustm',
+        GitHubRepositories : 'hexo-source',
+
+        BlogUser      : 'Lustm',
+        BlogAvatar    : 'https://raw.githubusercontent.com/lustm/IMG/main/images/avatar.jpg',
+        BlogStartDate : '2021-12-23',
+
+        WebsiteTitleBlur         : '(◍´꒳`◍) Hi, come back quickly',
+        WebsiteTitleBlurTimeOut  : 500,
+        WebsiteTitleFocus        : '(*´∇｀*) Welcome back!',
+        WebsiteTitleFocusTimeOut : 1000,
+        WebsiteFavicon           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/logo.png',
+
+        ProgressBar: {
+            id       : 'topProgressBar',
+            color    : '#77B6FF',
+            height   : '2px',
+            duration : 0.2
+        },
+
+        Loading: {
+            rebound: {
+                tension  : 16,
+                friction : 5
+            },
+            spinner: {
+                id     : 'spinner',
+                radius : 90,
+                sides  : 3,
+                depth  : 4,
+                colors : {
+                    background : '#F0F0F0',
+                    stroke     : '#272633',
+                    base       : '',
+                    child      : '#272633'
+                },
+                alwaysForward : true,
+                restAt        : 0.5,
+                renderBase    : false
+            }
+        },
+
+        HomeHeaderAnimationRendered : true,
+        HomeHeaderAnimation         : {
+            radius      : 15,
+            density     : 0.2,
+            color       : 'rgba(255, 255, 255, .2)',
+            clearOffset : 0.3
+        },
+
+        ArticleHeaderAnimationRendered : false,
+        ArticleHeaderAnimation         : {
+            triW                  : 14,
+            triH                  : 20,
+            neighbours            : [
+                
+                    'side',
+                
+                    'top',
+                
+                    'bottom',
+                
+            ],
+            speedTrailAppear      : 0.1,
+            speedTrailDisappear   : 0.1,
+            speedTriOpen          : 1,
+            trailMaxLength        : 30,
+            trailIntervalCreation : 100,
+            delayBeforeDisappear  : 2,
+            colors                : [
+                
+                    '#96EDA6',
+                
+                    '#5BC6A9',
+                
+                    '#38668C',
+                
+                    '#374D84',
+                
+                    '#BED5CB',
+                
+                    '#62ADC6',
+                
+                    '#8EE5DE',
+                
+                    '#304E7B',
+                
+            ]
+        },
+
+        BackAnimationRendered          : true,
+        IEBrowserBackAnimationRendered : false,
+        BackAnimation                  : {
+            colorSaturation  : '60%',
+            colorBrightness  : '50%',
+            colorAlpha       : 0.5,
+            colorCycleSpeed  : 5,
+            verticalPosition : 'random',
+            horizontalSpeed  : 200,
+            ribbonCount      : 3,
+            strokeSize       : 0,
+            parallaxAmount   : -0.2,
+            animateSections  : true
+        },
+
+        HomeHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpg',
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/home.jpeg',
+            
+        ],
+        HomeBannerText  : '',
+
+        ArticleHeaderImage : [
+            
+                'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/header/article.jpg',
+            
+        ],
+
+        OtherBannerText : '',
+
+        MenuList : [
+            
+                {
+                    name   : '首页',
+                    href   : '/',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '标签',
+                    href   : '/tag',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '分类',
+                    href   : '/category',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '归档',
+                    href   : '/archive',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '赞赏',
+                    href   : '/donate',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '关于',
+                    href   : '/about',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '订阅',
+                    href   : '/atom.xml',    
+                    target : '_blank',
+                    class  : ''
+                },
+            
+                {
+                    name   : '搜索',
+                    href   : '',    
+                    target : '',
+                    class  : 'search'
+                },
+            
+                {
+                    name   : '留言板',
+                    href   : '/comment',    
+                    target : '',
+                    class  : ''
+                },
+            
+                {
+                    name   : '友情链接',
+                    href   : '/friend',    
+                    target : '',
+                    class  : ''
+                },
+            
+        ],
+        MenuLink : [
+            
+                
+                    {
+                        icon : 'icon-weibo', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-wechat', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-qq', 
+                        url  : ''
+                    },
+                
+                    {
+                        icon : 'icon-github', 
+                        url  : 'https://github.com/lustm'
+                    },
+                
+            
+        ],
+
+        FooterStyle : 2,
+        BottomText  : {
+            icon    : 'like-fill',
+            left    : '人生若只如初见',
+            right   : '何事秋风悲画扇'
+        },
+        ThemeInfo   : true,
+
+        ConsoleList : [
+            
+                
+                    [
+                        
+                            
+                                'Based on cnblogs theme SimpleMemory.',
+                            
+                                '',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'SimpleMemory Author:',
+                            
+                                'BNDong',
+                            
+                        
+                    ],
+                
+                    [
+                        
+                            
+                                'Theme:',
+                            
+                                'LiveForCode',
+                            
+                        
+                    ],
+                
+            
+        ],
+
+        FontIconExtend : '',
+
+        Donate : {
+            paypal  : '',
+            bitcoin : '',
+            alipay  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/alipay.png',
+            wechat  : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/donate/wechat.png'
+        },
+
+        Code : {
+            style : 'normal'
+        },  
+
+        Search : {
+            applicationID : 'BX367M4TD2',
+            apiKey        : '522ed64d7cc9964a9fe64ad7f15b66bf',
+            indexName     : 'hexo',
+            hits          : {
+                page : 10
+            },
+            labels        : {
+                placeholder : '搜索',
+                empty       : '未发现与 「${query}」 相关的内容',
+                stats       : '${hits} 条相关条目，使用了 ${time} 毫秒',
+            }
+        }, 
+
+        Valine : {
+            switch         : true,
+            el             : '.comments-content',
+            appId          : 'vU2CPQHyaPOyOheG1dc6zkOt-MdYXbMMI',
+            appKey         : 'xAx3L0LGorEGIyPEjqhcc4nb',
+            placeholder    : '你是我一生只会遇见一次的惊喜...',
+            avatar         : 'mm',
+            meta           : 'nick,mail,link',
+            requiredFields : 'nick,mail',
+            pageSize       : 5,
+            lang           : 'zh-cn',
+            visitor        : true,
+            enableQQ       : true
+        },
+
+        Tocbot : {
+            switch                : true,
+            tocSelector           : '.toc',
+            contentSelector       : '.article-body',
+            headingSelector       : 'h1, h2, h3, h4, h5',
+            headingsOffset        : 0,
+            scrollSmooth          : true,
+            scrollSmoothOffset    : -5,
+            positionFixedSelector : '.toc',
+            positionFixedClass    : 'toc-fixed',
+            fixedSidebarOffset    : '',
+        },
+
+        Require : {
+            baseUrl     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/',
+            waitSeconds : 100
+        },
+
+        Music : {
+            type : 'Meting'
+        },
+        APlayer : {
+            container : '.aplayer',
+            fixed     : true,
+            autoplay  : false,
+            loop      : 'all',
+            order     : 'random',
+            preload   : 'auto',
+            volume    : 0.67,
+            mutex     : true,
+            lrcType   : 3,
+            audio     : [
+                
+                    {
+                        name   : 'aLIEz',
+                        artist : 'mizuki（瑞葵）',
+                        cover  : '/music/cover/aLIEz.jpg',
+                        url    : '/music/song/aLIEz.mp3',
+                        lrc    : '/music/lrc/aLIEz.lrc'
+                    },
+                
+                    {
+                        name   : 'Endless Tears',
+                        artist : 'CLIFF EDGE',
+                        cover  : '/music/cover/Endless Tears.jpg',
+                        url    : '/music/song/Endless Tears.mp3',
+                        lrc    : '/music/lrc/Endless Tears.lrc'
+                    },
+                
+                    {
+                        name   : 'Miracle',
+                        artist : 'Cascada',
+                        cover  : '/music/cover/Miracle.jpg',
+                        url    : '/music/song/Miracle.mp3',
+                        lrc    : '/music/lrc/Miracle.lrc'
+                    },
+                
+                    {
+                        name   : 'Roll The Dice',
+                        artist : '高珊',
+                        cover  : '/music/cover/Roll The Dice.jpg',
+                        url    : '/music/song/Roll The Dice.mp3',
+                        lrc    : '/music/lrc/Roll The Dice.lrc'
+                    },
+                
+                    {
+                        name   : 'See You Again',
+                        artist : 'Charlie Puth, Wiz Khalifa',
+                        cover  : '/music/cover/See You Again.jpg',
+                        url    : '/music/song/See You Again.mp3',
+                        lrc    : '/music/lrc/See You Again.lrc'
+                    },
+                
+                    {
+                        name   : 'Traveling Light',
+                        artist : 'Joel Hanson, Sara Groves',
+                        cover  : '/music/cover/Traveling Light.jpg',
+                        url    : '/music/song/Traveling Light.mp3',
+                        lrc    : '/music/lrc/Traveling Light.lrc'
+                    },
+                
+                    {
+                        name   : '痴心绝对',
+                        artist : '李圣杰',
+                        cover  : '/music/cover/痴心绝对.jpg',
+                        url    : '/music/song/痴心绝对.mp3',
+                        lrc    : '/music/lrc/痴心绝对.lrc'
+                    },
+                
+                    {
+                        name   : '好想大声说爱你',
+                        artist : 'BAAD（バード）',
+                        cover  : '/music/cover/好想大声说爱你.jpg',
+                        url    : '/music/song/好想大声说爱你.mp3',
+                        lrc    : '/music/lrc/好想大声说爱你.lrc'
+                    },
+                
+            ]
+        },
+        Meting : {
+            id       : '3778678', 
+            lrcshow  : false, 
+            server   : 'netease', 
+            type     : 'playlist', 
+            fixed    : true, 
+            autoplay : false, 
+            loop     : 'all', 
+            order    : 'random', 
+            preload  : 'auto', 
+            volume   : 0.67, 
+            mutex    : true
+        },
+
+        Mouse : {
+            enable  : true,
+            options : {
+                size  : 6,
+                sizeF : 24
+            }
+        },
+
+        LazyLoad : {
+            default : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/image/website/lazyload.svg'
+        },
+  
+        Style : {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/APlayer.css',
+            archive          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/archive.css',
+            donate           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/donate.css',
+            fancybox         : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/jquery.fancybox.css',
+            footer           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/footer.css',
+            iconfont         : 'https://at.alicdn.com/t/font_1546312_l3yohatebw.css',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/index.css',
+            menuBubble       : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/menu-bubble.css',
+            page             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/page.css',
+            post             : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/post.css',
+            search           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/search.css',
+            tocbot           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/tocbot.css',
+            normal           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/normal.css',
+            night            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/night.css',
+            clipboard        : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/css/clipboard.css'
+        },
+
+        Script: {
+            aplayer          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/APlayer.min.js',
+            config           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.config.js',
+            index            : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js',
+            instantSearch    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/instantsearch.min.js',
+            jQuery           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/jquery-3.4.1.min.js',
+            loading          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/loading.js',
+            meting           : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/Meting.min.js',
+            iscroll          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/iscroll.js',
+            require          : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/require.min.js'
+        },
+
+        Font: {
+            LongCang   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/LongCang.css',
+            Monda      : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Monda.css',
+            NotoSansSC : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/NotoSansSC.css',
+            Playball   : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Playball.css',
+            PTMono     : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/PTMono.css',
+            RobotoSlab : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/RobotoSlab.css',
+            Rosario    : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/Rosario.css',
+            UbuntuMono : 'https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/font/UbuntuMono.css'
+        },
+
+        Suffix : {
+            about : '简单地活着, 肆意又精彩.'
+        },
+            
+        Theme : {
+            url  : 'https://github.com/first19326/Hexo-LiveForCode',
+            name : 'Hexo - Live For Code'
+        }  
+    };
+</script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/gh/first19326/cdn@master/static/js/index.js"></script>
+</body>
+</html>
